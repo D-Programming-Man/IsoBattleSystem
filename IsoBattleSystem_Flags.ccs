@@ -1,0 +1,38 @@
+//+=+=+=+=+=+= FLAGS =+=+=+=+=+=+=+
+define VICTORY_FLAG			= 0x3FF
+define DISABLE_SWIRL_FLAG 	= 0x3FE
+define PARTY_RUNAWAY_FLAG 	= 0x3DF
+
+define NESS_ATK_FLAG 		= 0x3FD
+define NESS_PSI_FLAG		= 0x3FC
+define NESS_GOODS_FLAG		= 0x3FB
+define NESS_DEF_FLAG		= 0x3FA
+define NESS_DMG_FLAG		= 0x3F9
+define NESS_STATUS_AFF_FLAG	= 0x3F8
+define NESS_ACT_END_FLAG	= 0x3F7
+
+define PAULA_ATK_FLAG		= 0x3F6
+define PAULA_PSI_FLAG		= 0x3F5
+define PAULA_GOODS_FLAG		= 0x3F4
+define PAULA_DEF_FLAG		= 0x3F3
+define PAULA_PRAY_FLAG		= 0x3F2
+define PAULA_DMG_FLAG		= 0x3F1
+define PAULA_STATUS_AFF_FLAG= 0x3F0
+define PAULA_ACT_END_FLAG	= 0x3EF
+
+define JEFF_ATK_FLAG		= 0x3EE
+define JEFF_SPY_FLAG		= 0x3ED
+define JEFF_GOODS_FLAG		= 0x3EC
+define JEFF_DEF_FLAG		= 0x3EB
+define JEFF_DMG_FLAG		= 0x3EA
+define JEFF_STATUS_AFF_FLAG	= 0x3E9
+define JEFF_ACT_END_FLAG	= 0x3E8
+
+define POO_ATK_FLAG			= 0x3E7
+define POO_PSI_FLAG			= 0x3E6
+define POO_GOODS_FLAG		= 0x3E5
+define POO_DEF_FLAG			= 0x3E4
+define POO_MIRROR_FLAG		= 0x3E3
+define POO_DMG_FLAG			= 0x3E2
+define POO_STATUS_AFF_FLAG	= 0x3E1
+define POO_ACT_END_FLAG		= 0x3E0

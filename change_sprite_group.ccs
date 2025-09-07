@@ -1,0 +1,49 @@
+import asm65816
+import movscr_codes
+
+define MEM_ObjSpriteGraphicsPtrLo       = 0x29CA
+define MEM_ObjSpriteGraphicsPtrHi       = 0x2A06
+define MEM_ObjSpriteGraphicsBank        = 0x2A42
+define MEM_ObjSpriteGroup               = 0x2CD6
+
+_MOVASM_ChangeSpriteGroup:
+    // Call with sprite group # in A
+    LDX_d(0x88)
+    // Set sprite group and sprite graphics ptr
+    STA_x(MEM_ObjSpriteGroup)
+    // spr_grp * 4
+    ASL
+    ASL
+    TAY
+    // v0.71: Load "SPRITE_GROUPING_PTR_TABLE" from a function in ROM
+    // This is because CoilSnake relocates this table now, and will
+    // write the correct table address at this location. However, it
+    // can't relocate our reference here, so we need to load a pointer
+    // which it has overwritten.
+    LDA_al(0xC01DFA)
+    STA_d(0x12)
+    LDA_al(0xC01DFF)
+    STA_d(0x14)
+    // Load the correct sprite group pointer from the table
+    LDA_dly(0x12)
+    STA_d(0x06)
+    CLC
+    ADC_i(9) // Skip to first pointer addr
+    STA_x(MEM_ObjSpriteGraphicsPtrLo)
+    INY
+    INY
+    LDA_dly(0x12)
+    STA_d(0x08)
+    STA_x(MEM_ObjSpriteGraphicsPtrHi)
+    // Load bank byte of graphics data
+    LDY_i(0x0008)
+    LDA_dly(0x06)
+    AND_i(0x00ff)
+    STA_x(MEM_ObjSpriteGraphicsBank)
+    RTL
+
+command MOV_ChangeSpriteGroup(spritegroup) {
+    m_set_result(spritegroup)
+    m_asmcall(_MOVASM_ChangeSpriteGroup)
+	m_refresh_graphics
+}

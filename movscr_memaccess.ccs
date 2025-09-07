@@ -1,0 +1,104 @@
+import asm65816
+import movscr_codes
+
+///////////////////////////////
+// ===== 16-bit writes ===== //
+///////////////////////////////
+
+_ASM_m_set_mem16_at_var0: { LDX_i(0x0E5E) JMP(_ASM_m_set_mem16_common) }
+_ASM_m_set_mem16_at_var1: { LDX_i(0x0E9A) JMP(_ASM_m_set_mem16_common) }
+_ASM_m_set_mem16_at_var2: { LDX_i(0x0ED6) JMP(_ASM_m_set_mem16_common) }
+_ASM_m_set_mem16_at_var3: { LDX_i(0x0F12) JMP(_ASM_m_set_mem16_common) }
+_ASM_m_set_mem16_at_var4: { LDX_i(0x0F4E) JMP(_ASM_m_set_mem16_common) }
+_ASM_m_set_mem16_at_var5: { LDX_i(0x0F8A) JMP(_ASM_m_set_mem16_common) }
+_ASM_m_set_mem16_at_var6: { LDX_i(0x0FC6) JMP(_ASM_m_set_mem16_common) }
+_ASM_m_set_mem16_at_var7: { LDX_i(0x1002) JMP(_ASM_m_set_mem16_common) }
+_ASM_m_set_mem16_common:
+    TAY
+    TXA
+    CLC
+    ADC_d(0x88) // object table offset for cur. object
+    TAX
+    TYA
+    STA_x(0)
+    RTL
+
+command m_set_mem16_at_var0 { m_asmcall(_ASM_m_set_mem16_at_var0) }
+command m_set_mem16_at_var1 { m_asmcall(_ASM_m_set_mem16_at_var1) }
+command m_set_mem16_at_var2 { m_asmcall(_ASM_m_set_mem16_at_var2) }
+command m_set_mem16_at_var3 { m_asmcall(_ASM_m_set_mem16_at_var3) }
+command m_set_mem16_at_var4 { m_asmcall(_ASM_m_set_mem16_at_var4) }
+command m_set_mem16_at_var5 { m_asmcall(_ASM_m_set_mem16_at_var5) }
+command m_set_mem16_at_var6 { m_asmcall(_ASM_m_set_mem16_at_var6) }
+command m_set_mem16_at_var7 { m_asmcall(_ASM_m_set_mem16_at_var7) }
+
+//////////////////////////////
+// ===== 8-bit writes ===== //
+//////////////////////////////
+
+_ASM_m_set_mem8_at_var0: { LDX_i(0x0E5E) JMP(_ASM_m_set_mem8_common) }
+_ASM_m_set_mem8_at_var1: { LDX_i(0x0E9A) JMP(_ASM_m_set_mem8_common) }
+_ASM_m_set_mem8_at_var2: { LDX_i(0x0ED6) JMP(_ASM_m_set_mem8_common) }
+_ASM_m_set_mem8_at_var3: { LDX_i(0x0F12) JMP(_ASM_m_set_mem8_common) }
+_ASM_m_set_mem8_at_var4: { LDX_i(0x0F4E) JMP(_ASM_m_set_mem8_common) }
+_ASM_m_set_mem8_at_var5: { LDX_i(0x0F8A) JMP(_ASM_m_set_mem8_common) }
+_ASM_m_set_mem8_at_var6: { LDX_i(0x0FC6) JMP(_ASM_m_set_mem8_common) }
+_ASM_m_set_mem8_at_var7: { LDX_i(0x1002) JMP(_ASM_m_set_mem8_common) }
+_ASM_m_set_mem8_common:
+    TAY
+    TXA
+    CLC
+    ADC_d(0x88) // object table offset for cur. object
+    TAX
+    TYA
+    SEP(0x20)
+    STA_x(0)
+    REP(0x20)
+    RTL
+
+command m_set_mem8_at_var0 { m_asmcall(_ASM_m_set_mem8_at_var0) }
+command m_set_mem8_at_var1 { m_asmcall(_ASM_m_set_mem8_at_var1) }
+command m_set_mem8_at_var2 { m_asmcall(_ASM_m_set_mem8_at_var2) }
+command m_set_mem8_at_var3 { m_asmcall(_ASM_m_set_mem8_at_var3) }
+command m_set_mem8_at_var4 { m_asmcall(_ASM_m_set_mem8_at_var4) }
+command m_set_mem8_at_var5 { m_asmcall(_ASM_m_set_mem8_at_var5) }
+command m_set_mem8_at_var6 { m_asmcall(_ASM_m_set_mem8_at_var6) }
+command m_set_mem8_at_var7 { m_asmcall(_ASM_m_set_mem8_at_var7) }
+
+//////////////////////////////
+// ===== 16-bit reads ===== //
+//////////////////////////////
+_ASM_m_get_mem16_at_result:
+    TAX
+    LDA_x(0)
+    RTL
+
+command m_get_mem16_at_result m_asmcall(_ASM_m_get_mem16_at_result)
+command m_get_mem16_at_var0 { m_get_var0 m_get_mem16_at_result }
+command m_get_mem16_at_var1 { m_get_var1 m_get_mem16_at_result }
+command m_get_mem16_at_var2 { m_get_var2 m_get_mem16_at_result }
+command m_get_mem16_at_var3 { m_get_var3 m_get_mem16_at_result }
+command m_get_mem16_at_var4 { m_get_var4 m_get_mem16_at_result }
+command m_get_mem16_at_var5 { m_get_var5 m_get_mem16_at_result }
+command m_get_mem16_at_var6 { m_get_var6 m_get_mem16_at_result }
+command m_get_mem16_at_var7 { m_get_var7 m_get_mem16_at_result }
+
+/////////////////////////////
+// ===== 8-bit reads ===== //
+/////////////////////////////
+
+_ASM_m_get_mem8_at_result:
+    TAX
+    LDA_x(0)
+    AND_i(0x00FF)
+    RTL
+
+command m_get_mem8_at_result m_asmcall(_ASM_m_get_mem8_at_result)
+command m_get_mem8_at_var0 { m_get_var0 m_get_mem8_at_result }
+command m_get_mem8_at_var1 { m_get_var1 m_get_mem8_at_result }
+command m_get_mem8_at_var2 { m_get_var2 m_get_mem8_at_result }
+command m_get_mem8_at_var3 { m_get_var3 m_get_mem8_at_result }
+command m_get_mem8_at_var4 { m_get_var4 m_get_mem8_at_result }
+command m_get_mem8_at_var5 { m_get_var5 m_get_mem8_at_result }
+command m_get_mem8_at_var6 { m_get_var6 m_get_mem8_at_result }
+command m_get_mem8_at_var7 { m_get_var7 m_get_mem8_at_result }

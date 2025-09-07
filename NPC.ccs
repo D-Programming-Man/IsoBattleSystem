@@ -1,0 +1,1157 @@
+import asm65816
+import ccexpand
+import movscr_codes
+import movscr_memaccess	// cooprocks123e's implemenation of memory access (read/write)
+import Bowspr
+import BowsprCC
+import IsoBattleSystem_Flags
+import battle_menu
+import menu_macros
+import change_sprite_group
+
+/*
+TODO: 	. Incorprate the rest of the battle animations to the other party members
+		. Something... forgot what it was though
+*/
+//+=+=+=+=+=+= Defines =+=+=+=+=+=+=+
+define wait_for_action 		= "[1F 61]"
+define AS_NESS_X_POS 		= 0x38
+define AS_PAULA_X_POS	 	= 0x54
+define AS_JEFF_X_POS	 	= 0x6C
+define AS_POO_X_POS 		= 0x84
+define AS_FRONT_ROW_Y_POS 	= 0x80
+define AS_BACK_ROW_Y_POS	= 0x88
+define CURRENT_PARTY_ADDR 	= 0x988B	// length 7 Bytes
+define PTY_BTLR_ADDR		= 0x9FAC
+define PTY_BTLR_STRUCT_SIZE = 0x4E
+
+define TIME_ACT_TO_IDLE		= 1			// In Frames
+
+// Action Script Sprite Direction
+define N  = 1
+define E  = 2
+define S  = 3
+define W  = 6
+define NE = 8
+define SE = 9
+define SW = 10
+define NW = 11
+
+// Ness' Sprite Group Defines
+define NESS_IDLE_SPRITE 	= 1
+define NESS_UNCON_SPRITE	= 8
+define NESS_DIA_SPRITE 		= 12
+define NESS_PARA_SPRITE		= 13
+define NESS_NAUS_SPRITE		= 1
+define NESS_POIS_SPRITE		= 1
+define NESS_SUNS_SPRITE		= 1
+define NESS_COLD_SPRITE		= 1
+define NESS_MUSH_SPRITE		= 226
+define NESS_POSS_SPRITE		= 1
+define NESS_SLEEP_SPRITE	= 16
+define NESS_CRY_SPRITE		= 1
+define NESS_IMMOB_SPRITE	= 13
+define NESS_SOLID_SPRITE	= 13
+define NESS_FEELS_SPRITE	= 1
+define NESS_CNTCON_SPRITE	= 1
+define NESS_HMSIK_SPRITE	= 1
+
+define NESS_ATK_SPRITE 		= 13
+define NESS_PSI_SPRITE		= 6
+define NESS_GOODS_SPRITE	= 17
+define NESS_DEF_SPRITE		= 5
+define NESS_RUNAWAY_SPRITE	= 1
+define NESS_VICTORY_SPRITE	= 14
+
+
+//+=+=+=+=+=+= Commands =+=+=+=+=+=+=+
+// Tie sprite position relative to the correct layer (windows layer) based on BGMODE (0x000F).
+// Thanks Vittorio
+command Vittorio_bowspr_preamble {
+
+m_get_mem16(0x000F) m_and_result(1) m_jeq(M_mode0)
+
+M_mode1: m_onposition(0xA055) m_jmp(M_continue)
+M_mode0: m_onposition(0xA023)
+
+M_continue:
+// start the actionscript here.
+}
+
+//+=+=+=+=+=+= Text / Control Codes =+=+=+=+=+=+=+
+
+NPC:
+	set(DISABLE_SWIRL_FLAG)
+	unset(NESS_ATK_FLAG)
+	unset(NESS_DEF_FLAG)
+	unset(NESS_DMG_FLAG)
+	unset(NESS_PSI_FLAG)
+	unset(NESS_STATUS_AFF_FLAG)
+	
+	//party_add(2)
+	//party_add(3)
+	//party_add(4)
+	//"[19 05 01 02 03]"
+	music(0x82)
+	battle(171)
+	eob
+	
+DogEncounter:	
+	"@You engage " call(0xEF794B) "[03]" eob
+	
+Hide:
+	window_open(1)
+	"@Hiding the players" next
+	"[1F E5 FF]"
+	hide_party
+	window_closeall
+	eob
+	
+Show:
+	window_open(1)
+	"@Showing the players" next
+	"[1F E8 FF]"
+	show_party(1)
+	window_closeall
+	eob
+	
+Test:
+	"@This is a test" next
+	eob
+	
+Ness_Bash:
+    sound(SND_HEROATTACK) "@{user} attacks! [03]"
+	set(NESS_ATK_FLAG)
+	wait_for_action
+	eob
+	
+Paula_Bash:
+    sound(SND_HEROATTACK) "@{user} attacks! [03]"
+	set(PAULA_ATK_FLAG)
+	wait_for_action
+	eob
+	
+Jeff_Bash:
+    sound(SND_HEROATTACK) "@{user} attacks! [03]"
+	set(JEFF_ATK_FLAG)
+	wait_for_action
+	eob
+	
+Poo_Bash:
+    sound(SND_HEROATTACK) "@{user} attacks! [03]"
+	set(POO_ATK_FLAG)
+	wait_for_action
+	eob
+	
+Jeff_Shoot:
+    sound(SND_HEROATTACK) "@{user} attacks! [03]"
+	set(JEFF_ATK_FLAG)
+	wait_for_action
+	eob
+	
+SFX_BASH:
+	sound(SND_BASH)
+	eob
+	
+SFX_SHOOT:
+	sound(SND_SHOOT)
+	eob
+
+// NOTE: Order matters on which spirite gets loaded because the first one sets up
+//       the palettes for the rest of the other characters to use
+Create_Party_Spr:
+	BowsprCC_Begin(0, 2)
+	BowsprCC_CreateSprite(1, CreateNessBattleSprLogic)
+	BowsprCC_CreateSprite(2, CreatePaulaBattleSpr)
+	BowsprCC_CreateSprite(3, CreateJeffBattleSpr)
+	BowsprCC_CreateSprite(4, CreatePooBattleSpr)
+	BowsprCC_CreateSprite(264, NessCreateTinyGhost)
+	eob
+	
+Ness_Create_Mushroom:
+	BowsprCC_CreateSprite(226, NessCreateMushroom)
+	eob
+	
+Ness_Create_TinyGhost:
+	BowsprCC_CreateSprite(264, NessCreateTinyGhost)
+	eob
+
+//+=+=+=+=+=+= Action Scripts =+=+=+=+=+=+=+
+
+NPCActionScript: {
+	m_set_anim(0)
+	m_priority(0)
+    m_refresh_graphics_frame0
+    m_task_long (MovTask_Anim16_DestroyIfFar)
+
+loop:
+	m_wait_until_touch
+	//m_textcall2(Hide)
+	//m_pause(60)
+	
+	//m_textcall2(Show)
+	//m_pause(60)
+	
+	m_textcall(NPC)
+	m_pause(60)
+	
+	m_jmp (loop)
+}	
+
+//+=+=+=+=+= NESS =+=+=+=+=+=+
+
+define NessIdleAnimation = {	
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessAffIdleAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessAttackAnimation = {
+	m_set_facing_anim(NE, 0)
+	
+	m_refresh_graphics_frame1
+	m_pause(10)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+	m_refresh_graphics_frame0
+	m_pause(10)
+}
+
+define NessGoodsAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+}
+
+define NessDefendAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+}
+
+define NessPSIAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+}
+
+define NessRunawayAnimation = {
+	m_set_facing_anim(SW, 0)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+}
+
+define NessUnconsciousAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessDiamondizedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessParalizedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessNauseousAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessPoisonedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessSunstrokeAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessColdAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessMashroomizedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessPossessedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessSleepingAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessCryingAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessImmobilizedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessSolidifedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessFeelingStrangeAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessCannotConcentrateAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessHomesicknessAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define NessVictoryAnimation = {
+	m_set_facing_anim(S, 0)
+	m_pause(1)
+}
+
+/////////////////////////////////////////////////////////////////
+
+/*
+WARNING: Mushroomizing or having the party being possessed too much will make the
+		 battle sprites have some parts of them being replaced by the tiny mushroom
+		 or lil ghost sprite, so make sure that your enemies don't mushroomized or possess
+		 too much.
+*/
+NessCreateMushroom: {
+	Vittorio_bowspr_preamble
+	m_ontick_nop
+	m_priority(0)
+	
+	m_set_facing_anim(N, 0)
+	m_refresh_graphics
+	m_warp_to_sprite(NESS_IDLE_SPRITE)
+	m_add_ypos(-0x0E)
+	
+	m_set_result(PTY_BTLR_ADDR)
+	m_add_result(0x1E)
+	m_rtovar7		// Ness's Sprite Changing status
+
+Loop:
+	m_get_var7
+	m_get_mem8_at_result
+	m_multijmp(3)
+		short End
+		short LoopBack
+		short End
+	m_jmp (End)
+	
+LoopBack:
+	m_pause(1)
+	m_jmp(Loop)
+	
+End:
+	m_destroy_self
+}
+
+// Common Action Script function for Tiny Ghost circling around the player
+CalcTinyGhostPosition: {
+CheckYDirection:
+	m_get_var6
+	m_asmcall(Sine)	// Sine Function
+	m_asmcall(ASM_Divide16FromResult)
+	m_rtovar4
+	
+	m_get_var5
+	m_jne(GhostFloatYPos)
+	
+	GoingUp:				// This is when the ghost sprite is going up, usually goes down first
+		m_get_var4
+		m_xor_result(0xFFFF)
+		m_add_result(0x01)	// Two's Compliment to get negative number
+		m_rtovar4
+	
+	GhostFloatYPos:
+		m_get_var4
+		m_asmcall(ASM_ResultPlusVar0)
+		m_asmcall(ASM_SetObjYPosFromResult)
+
+		m_get_var6
+		m_add_result(1)
+		m_rtovar6
+	
+		m_and_result(0x80)
+		m_jeq(CheckXDirection)
+	
+	ChangeFloatingDirectionYPos:
+		m_get_var5
+		m_xor_result(0x01)
+		m_and_result(0x01)
+		m_rtovar5
+		m_set_var6(0)
+	
+CheckXDirection:
+	m_get_var3
+	m_asmcall(Sine)	// Sine Function
+	m_asmcall(ASM_Divide8FromResult)
+	m_rtovar4
+	
+	m_get_var2
+	m_jne(GhostFloatXPos)
+	
+	GoingLeft:				// This is when the ghost sprite is going left, usually goes right first
+		m_get_var4
+		m_xor_result(0xFFFF)
+		m_add_result(0x01)	// Two's Compliment to get negative number
+		m_rtovar4
+	
+	GhostFloatXPos:
+		m_get_var4
+		m_asmcall(ASM_ResultPlusVar1)
+		m_asmcall(ASM_SetObjXPosFromResult)
+
+		m_get_var3
+		m_add_result(1)
+		m_rtovar3
+	
+		m_and_result(0x80)
+		m_jeq(Return)
+	
+	ChangeFloatingDirectionXPos:
+		m_get_var2
+		m_xor_result(0x01)
+		m_and_result(0x01)
+		m_rtovar2
+		m_set_var3(0)
+
+Return:
+	m_rtl
+}
+
+NessCreateTinyGhost: {
+	Vittorio_bowspr_preamble
+	m_ontick_nop
+	m_priority(0)
+	
+	m_set_facing_anim(N, 0)
+	m_refresh_graphics
+	m_warp_to_sprite(NESS_IDLE_SPRITE)
+	m_add_ypos(-0x0E)
+	
+	m_set_result(PTY_BTLR_ADDR)
+	m_add_result(0x1E)
+	m_rtovar7		// Ness's Sprite Changing status
+	m_set_var6(0)	// Frame count for our Sine function in Y direction
+	m_set_var3(0x40)// Frame count for our Sine function in x direction
+	m_set_var5(0)	// Ghost Direction Flag to check to add or subtract y-pos from the sine function
+	m_set_var2(0)	// Ghost Direction Flag to check to add or subtract x-pos from the sine function
+	m_set_var4(0)	// Return Value from the Sine funciton
+	m_asmcall(ASM_GetObjYPosToResult)
+	m_rtovar0		// var0 is the initial position of the ghost sprite's y-Pos
+	m_asmcall(ASM_GetObjXPosToResult)
+	m_rtovar1		// var1 is the initial position of the ghost sprite's x-pos
+	
+Loop:
+	m_get_var7
+	m_get_mem8_at_result
+	m_multijmp(3)
+		short End
+		short End
+		short Continue
+	m_jmp (End)
+	
+Continue:
+	m_jsl(CalcTinyGhostPosition)
+	
+LoopBack:
+	m_pause(1)
+	m_jmp(Loop)
+	
+End:
+	m_destroy_self
+}
+
+CreateNessBattleSprLogic: {
+	Vittorio_bowspr_preamble
+	m_ontick_nop
+	m_priority(3)
+	
+	m_get_mem16(0x988B)
+	m_and_result(0xFF)
+	m_add_result(-1)
+	m_jne(End)
+	
+	m_set_xpos(AS_NESS_X_POS)
+	m_set_ypos(AS_FRONT_ROW_Y_POS)
+	m_set_facing_anim(NE, 0)
+						
+	m_set_result(PTY_BTLR_ADDR)
+	m_rtovar7			// Var7 contains Ness's Battler address
+	
+Loop:
+	m_get_flag(VICTORY_FLAG)
+	m_jne(Victory)
+	
+	m_pause(1)
+		
+Attack:
+	m_get_flag(NESS_ATK_FLAG)
+	m_jeq(Goods)
+	
+	m_unlock_text
+	
+	MOV_ChangeSpriteGroup(NESS_ATK_SPRITE)
+	NessAttackAnimation
+	
+	m_unset_flag(NESS_ATK_FLAG)
+	m_jmp(Loop_Back)
+	
+Goods:
+	m_get_flag(NESS_GOODS_FLAG)
+	m_jeq(Defend)
+	
+	MOV_ChangeSpriteGroup(NESS_GOODS_SPRITE)
+	
+	GoodsLockingWait:
+		NessGoodsAnimation
+		
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		//m_jeq(Normal)
+		m_multijmp(3)
+			short GoodsContinue
+			short GoodsUnconscious
+			short GoodsDiamondized
+			
+	GoodsContinue:
+		m_get_flag(NESS_GOODS_FLAG)
+		m_jne(GoodsLockingWait)
+		m_jmp(Loop_Back)
+		
+	GoodsUnconscious:
+		m_unset_flag(NESS_GOODS_FLAG)
+		m_jmp(Unconscious)
+
+	GoodsDiamondized:
+		m_unset_flag(NESS_GOODS_FLAG)
+		m_jmp(Diamondized)
+	
+Defend:
+	m_get_flag(NESS_DEF_FLAG)
+	m_jeq(PSI)
+	
+	MOV_ChangeSpriteGroup(NESS_DEF_SPRITE)
+	
+	DefendLockingWait:
+		NessDefendAnimation
+		
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		//m_jeq(Normal)
+		m_multijmp(3)
+			short DefendContinue
+			short DefendUnconscious
+			short DefendDiamondized
+			
+		DefendContinue:
+			m_get_flag(NESS_DEF_FLAG)
+			m_jne(DefendLockingWait)
+			m_jmp(Loop_Back)
+		
+		DefendUnconscious:
+			m_unset_flag(NESS_DEF_FLAG)
+			m_jmp(Unconscious)
+		
+		DefendDiamondized:
+			m_unset_flag(NESS_DEF_FLAG)
+			m_jmp(Diamondized)
+	
+PSI:
+	m_get_flag(NESS_PSI_FLAG)
+	m_jeq(RunAway)
+	
+	MOV_ChangeSpriteGroup(NESS_PSI_SPRITE)
+	
+	PSILockingWait:
+		NessPSIAnimation
+			
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		//m_jeq(Normal)
+		m_multijmp(3)
+			short PSIContinue
+			short PSIUnconscious
+			short PSIDiamondized
+		
+	PSIContinue:
+		m_get_flag(NESS_PSI_FLAG)
+		m_jne(PSILockingWait)
+		m_jmp(Loop_Back)
+	
+	PSIUnconscious:
+		m_unset_flag(NESS_PSI_FLAG)
+		m_jmp(Unconscious)
+		
+	PSIDiamondized:
+		m_unset_flag(NESS_PSI_FLAG)
+		m_jmp(Diamondized)
+	
+RunAway:
+	m_get_flag(PARTY_RUNAWAY_FLAG)
+	m_jeq(StatusAffiction)
+	
+	MOV_ChangeSpriteGroup(NESS_RUNAWAY_SPRITE)
+	
+	RunawayLockingWait:
+		NessRunawayAnimation
+		
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		//m_jeq(Normal)
+		m_multijmp(3)
+			short RunAwayContinue
+			short RunAwayUnconscious
+			short RunAwayDiamondized
+		
+	RunAwayContinue:
+		m_get_flag(PARTY_RUNAWAY_FLAG)
+		m_jne(RunawayLockingWait)
+		m_jmp(Loop_Back)
+		
+	RunAwayUnconscious:
+		m_jmp(Unconscious)
+		
+	RunAwayDiamondized:
+		m_jmp(Diamondized)
+	
+StatusAffiction:
+	CheckHomesickness:
+		m_get_var7
+		m_add_result(0x22)
+		m_get_mem8_at_result
+		m_jne(Homesickness)
+	
+	CheckCannotConcentrate:
+		m_get_var7
+		m_add_result(0x21)
+		m_get_mem8_at_result
+		m_jne(CannotConcentrate)
+		
+	CheckFeelingStrange:
+		m_get_var7
+		m_add_result(0x20)
+		m_get_mem8_at_result
+		m_jne(FeelingStrange)
+		
+	CheckInOverworldAffliction:
+		m_get_var7
+		m_add_result(0x1E)
+		m_get_mem8_at_result
+		m_multijmp(3)
+			short CheckInBattleAffliction
+			short Mashroomized
+			short Possessed
+		
+	CheckInBattleAffliction:
+		m_get_var7
+		m_add_result(0x1F)
+		m_get_mem8_at_result
+		m_multijmp(5)
+			short CheckPermanentAffliction
+			short Sleeping
+			short Crying
+			short Immobilized
+			short Solidified
+		
+	CheckPermanentAffliction:
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		m_jeq(Normal)
+		m_multijmp(8)
+			short Normal
+			short Unconscious
+			short Diamondized
+			short Paralized
+			short Nauseous
+			short Poisoned
+			short Sunstroke
+			short Cold
+	
+Normal:
+	MOV_ChangeSpriteGroup(NESS_IDLE_SPRITE)
+	//m_sound(73)
+	NessIdleAnimation
+	m_jmp(Loop_Back)
+	
+Unconscious:
+	MOV_ChangeSpriteGroup(NESS_UNCON_SPRITE)
+	NessUnconsciousAnimation
+	m_jmp(Loop_Back)
+	
+Diamondized:
+	MOV_ChangeSpriteGroup(NESS_DIA_SPRITE)
+	NessDiamondizedAnimation
+	m_jmp(Loop_Back)
+
+Paralized:
+	MOV_ChangeSpriteGroup(NESS_PARA_SPRITE)
+	NessParalizedAnimation
+	m_jmp(Loop_Back)
+
+Nauseous:
+	MOV_ChangeSpriteGroup(NESS_NAUS_SPRITE)
+	NessNauseousAnimation
+	m_jmp(Loop_Back)
+	
+Poisoned:
+	MOV_ChangeSpriteGroup(NESS_POIS_SPRITE)
+	NessPoisonedAnimation
+	m_jmp(Loop_Back)
+
+Sunstroke:
+	MOV_ChangeSpriteGroup(NESS_SUNS_SPRITE)
+	NessSunstrokeAnimation
+	m_jmp(Loop_Back)
+
+Cold:
+	MOV_ChangeSpriteGroup(NESS_COLD_SPRITE)
+	NessColdAnimation
+	m_jmp(Loop_Back)
+
+Mashroomized:
+	MOV_ChangeSpriteGroup(NESS_MUSH_SPRITE)
+	NessMashroomizedAnimation
+	m_jmp(Loop_Back)
+
+Possessed:
+	MOV_ChangeSpriteGroup(NESS_POSS_SPRITE)
+	NessPossessedAnimation
+	m_jmp(Loop_Back)
+
+Sleeping:
+	MOV_ChangeSpriteGroup(NESS_SLEEP_SPRITE)
+	NessSleepingAnimation
+	m_jmp(Loop_Back)
+
+Crying:
+	MOV_ChangeSpriteGroup(NESS_CRY_SPRITE)
+	NessCryingAnimation
+	m_jmp(Loop_Back)
+
+Immobilized:
+	MOV_ChangeSpriteGroup(NESS_IMMOB_SPRITE)
+	NessImmobilizedAnimation
+	m_jmp(Loop_Back)
+
+Solidified:
+	MOV_ChangeSpriteGroup(NESS_SOLID_SPRITE)
+	NessSolidifedAnimation
+	m_jmp(Loop_Back)
+
+FeelingStrange:
+	MOV_ChangeSpriteGroup(NESS_FEELS_SPRITE)
+	NessFeelingStrangeAnimation
+	m_jmp(Loop_Back)
+
+CannotConcentrate:
+	MOV_ChangeSpriteGroup(NESS_CNTCON_SPRITE)
+	NessCannotConcentrateAnimation
+	m_jmp(Loop_Back)
+
+Homesickness:
+	MOV_ChangeSpriteGroup(NESS_HMSIK_SPRITE)
+	NessHomesicknessAnimation
+	m_jmp(Loop_Back)
+	
+Loop_Back:
+	m_jmp(Loop)
+	
+Victory:
+	// Turn around to face camera
+	m_set_facing_anim(NE, 0)
+	m_pause(5)
+	m_set_facing_anim(E, 0)
+	m_pause(5)
+	m_set_facing_anim(SE, 0)
+	m_pause(5)
+	m_set_facing_anim(S, 0)
+	m_pause(5)
+	
+	MOV_ChangeSpriteGroup(NESS_VICTORY_SPRITE)
+	
+	VictoryAnimLoop:
+		NessVictoryAnimation
+		m_jmp(VictoryAnimLoop)
+
+End:
+	m_destroy_self
+}
+
+//+=+=+=+=+= PAULA =+=+=+=+=+=+
+
+CreatePaulaBattleSpr: {
+	Vittorio_bowspr_preamble
+	m_ontick_nop
+	m_priority(0)
+	
+	m_get_mem16(0x988B)
+	m_and_result(0xFF)
+	m_add_result(-2)
+	m_jeq(Paula_Spr)
+	
+	m_get_mem16(0x988C)
+	m_and_result(0xFF)
+	m_add_result(-2)
+	m_jne(End)
+	
+Paula_Spr:
+	m_set_xpos(AS_PAULA_X_POS)
+	m_set_ypos(AS_BACK_ROW_Y_POS)
+	m_set_facing_anim(8, 0)
+	
+Loop:
+	m_pause(1)
+	
+	m_get_flag(PAULA_ATK_FLAG)
+	m_add_result(-1)
+	m_jne(Loop_Back)
+	
+	// Paula is attacking
+	m_unset_flag(PAULA_ATK_FLAG)
+	m_textcall2(SFX_BASH)
+	m_unlock_text
+	
+	// Attack Sprite Animation
+	m_refresh_graphics_frame1
+	m_pause(10)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	
+	m_jmp(Loop_Back)
+	
+Loop_Back:
+	m_jmp(Loop)
+	
+End:
+	m_destroy_self
+}
+
+//+=+=+=+=+= JEFF =+=+=+=+=+=+
+
+CreateJeffBattleSpr: {
+	Vittorio_bowspr_preamble
+	m_ontick_nop
+	m_priority(0)
+	
+	m_get_mem16(0x988B)
+	m_and_result(0xFF)
+	m_add_result(-3)
+	m_jeq(Jeff_Spr)
+	
+	m_get_mem16(0x988C)
+	m_and_result(0xFF)
+	m_add_result(-3)
+	m_jeq(Jeff_Spr)
+	
+	m_get_mem16(0x988D)
+	m_and_result(0xFF)
+	m_add_result(-3)
+	m_jne(End)
+	
+Jeff_Spr:
+	m_set_xpos(AS_JEFF_X_POS)
+	m_set_ypos(AS_FRONT_ROW_Y_POS)
+	m_set_facing_anim(8, 0)
+	
+Loop:
+	m_pause(1)
+	
+	m_get_flag(JEFF_ATK_FLAG)
+	m_add_result(-1)
+	m_jne(Loop_Back)
+	
+	// Jeff is attacking
+	m_unset_flag(JEFF_ATK_FLAG)
+	m_textcall2(SFX_BASH)
+	m_unlock_text
+	
+	// Attack Sprite Animation
+	m_refresh_graphics_frame1
+	m_pause(10)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	
+	m_jmp(Loop_Back)
+	
+Loop_Back:
+	m_jmp(Loop)
+	
+End:
+	m_destroy_self
+}
+
+//+=+=+=+=+= POO =+=+=+=+=+=+
+
+CreatePooBattleSpr: {
+	Vittorio_bowspr_preamble
+	m_ontick_nop
+	m_priority(0)
+	
+	m_get_mem16(0x988B)
+	m_and_result(0xFF)
+	m_add_result(-4)
+	m_jeq(Poo_Spr)
+	
+	m_get_mem16(0x988C)
+	m_and_result(0xFF)
+	m_add_result(-4)
+	m_jeq(Poo_Spr)
+	
+	m_get_mem16(0x988D)
+	m_and_result(0xFF)
+	m_add_result(-4)
+	m_jeq(Poo_Spr)
+	
+	m_get_mem16(0x988E)
+	m_and_result(0xFF)
+	m_add_result(-4)
+	m_jne(End)
+	
+Poo_Spr:
+	m_set_xpos(AS_POO_X_POS)
+	m_set_ypos(AS_BACK_ROW_Y_POS)
+	m_set_facing_anim(8, 0)
+	
+Loop:
+	m_pause(1)
+	
+	m_get_flag(POO_ATK_FLAG)
+	m_add_result(-1)
+	m_jne(Loop_Back)
+	
+	// Jeff is attacking
+	m_unset_flag(POO_ATK_FLAG)
+	m_textcall2(SFX_BASH)
+	m_unlock_text
+	
+	// Attack Sprite Animation
+	m_refresh_graphics_frame1
+	m_pause(10)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	
+	m_jmp(Loop_Back)
+	
+Loop_Back:
+	m_jmp(Loop)
+	
+End:
+	m_destroy_self
+}
+
+
+//+=+=+=+=+=+= ASM =+=+=+=+=+=+=+
+// Taken from the vanilla routines to return the current object's x and y coords on screen
+// Thanks Catador
+define Current_Object_Slot 	= 0x1A42
+define OBJ_Script_Var0 		= 0x0E5E
+define OBJ_Script_Var1		= 0x0E9A
+ASM_GetObjYPosToResult: {
+	REP (0x31)
+	PHD
+	LDA_a (Current_Object_Slot)
+	ASL
+	TAX
+	LDA_x (OBJ_map_y)
+	PLD
+	RTL
+}
+
+ASM_SetObjYPosFromResult: {
+	REP (0x31)
+	PHD
+	TAY
+	LDA_a (Current_Object_Slot)
+	ASL
+	TAX
+	TYA
+	STA_x (OBJ_map_y)
+	PLD
+	RTL
+}
+
+ASM_GetObjXPosToResult: {
+	REP (0x31)
+	PHD
+	LDA_a (Current_Object_Slot)
+	ASL
+	TAX
+	LDA_x (OBJ_map_x)
+	PLD
+	RTL
+}
+
+ASM_SetObjXPosFromResult: {
+	REP (0x31)
+	PHD
+	TAY
+	LDA_a (Current_Object_Slot)
+	ASL
+	TAX
+	TYA
+	STA_x (OBJ_map_x)
+	PLD
+	RTL
+}
+
+
+Sine:{
+	TAX
+	LDA_xl (0xC0B425) // Sine look-up table
+	AND_i (0x007F)
+	RTL
+}
+
+ASM_Divide16FromResult: {
+	LSR
+	LSR
+	LSR
+	LSR
+	RTL
+}
+
+ASM_Divide8FromResult: {
+	LSR
+	LSR
+	LSR
+	RTL
+}
+
+ASM_ResultPlusVar0: {
+	REP (0x31)
+	PHD
+	PHA
+	TDC
+	ADC_i (0xFFFE)
+	TCD
+	PLA
+	
+	TAY
+	LDA_a (Current_Object_Slot)
+	ASL
+	TAX
+	LDA_x (OBJ_Script_Var0)
+	STA_d (0x02)
+	TYA
+	CLC
+	ADC_d (0x02)
+	
+	PLD
+	RTL
+}
+
+ASM_ResultPlusVar1: {
+	REP (0x31)
+	PHD
+	PHA
+	TDC
+	ADC_i (0xFFFE)
+	TCD
+	PLA
+	
+	TAY
+	LDA_a (Current_Object_Slot)
+	ASL
+	TAX
+	LDA_x (OBJ_Script_Var1)
+	STA_d (0x02)
+	TYA
+	CLC
+	ADC_d (0x02)
+	
+	PLD
+	RTL
+}
+
+/*
+C4/68DC: C2 31        REP #$31
+C4/68DE: 0B           PHD
+C4/68DF: 48           PHA
+C4/68E0: 7B           TDC
+C4/68E1: 69 EE FF     ADC #$FFEE
+C4/68E4: 5B           TCD
+C4/68E5: 68           PLA
+C4/68E6: 85 10        STA $10
+C4/68E8: A2 00 00     LDX #$0000
+C4/68EB: 86 0E        STX $0E
+C4/68ED: AD 42 1A     LDA Current_Object_Slot
+C4/68F0: 0A           ASL
+C4/68F1: AA           TAX
+C4/68F2: A5 10        LDA $10
+C4/68F4: DD CA 0B     CMP OBJ_Pos_Y,X
+C4/68F7: B0 05        BCS $68FE
+C4/68F9: A2 01 00     LDX #$0001
+C4/68FC: 86 0E        STX $0E
+C4/68FE: A6 0E        LDX $0E
+C4/6900: 8A           TXA
+C4/6901: 2B           PLD
+C4/6902: 6B           RTL
+*/
