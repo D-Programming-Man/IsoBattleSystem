@@ -46,7 +46,7 @@ define NESS_NAUS_SPRITE		= 1
 define NESS_POIS_SPRITE		= 1
 define NESS_SUNS_SPRITE		= 1
 define NESS_COLD_SPRITE		= 1
-define NESS_MUSH_SPRITE		= 226
+define NESS_MUSH_SPRITE		= 1
 define NESS_POSS_SPRITE		= 1
 define NESS_SLEEP_SPRITE	= 16
 define NESS_CRY_SPRITE		= 1
@@ -58,10 +58,36 @@ define NESS_HMSIK_SPRITE	= 1
 
 define NESS_ATK_SPRITE 		= 13
 define NESS_PSI_SPRITE		= 6
-define NESS_GOODS_SPRITE	= 17
+define NESS_GOODS_SPRITE	= 1
 define NESS_DEF_SPRITE		= 5
 define NESS_RUNAWAY_SPRITE	= 1
 define NESS_VICTORY_SPRITE	= 14
+
+// Paula's Sprite Group Defines
+define PAULA_IDLE_SPRITE 	= 2
+define PAULA_UNCON_SPRITE	= 9
+define PAULA_DIA_SPRITE 	= 12
+define PAULA_PARA_SPRITE	= 13
+define PAULA_NAUS_SPRITE	= 2
+define PAULA_POIS_SPRITE	= 2
+define PAULA_SUNS_SPRITE	= 2
+define PAULA_COLD_SPRITE	= 2
+define PAULA_MUSH_SPRITE	= 2
+define PAULA_POSS_SPRITE	= 2
+define PAULA_SLEEP_SPRITE	= 16
+define PAULA_CRY_SPRITE		= 2
+define PAULA_IMMOB_SPRITE	= 13
+define PAULA_SOLID_SPRITE	= 13
+define PAULA_FEELS_SPRITE	= 2
+define PAULA_CNTCON_SPRITE	= 2
+define PAULA_HMSIK_SPRITE	= 2
+
+define PAULA_ATK_SPRITE		= 13
+define PAULA_PSI_SPRITE		= 2
+define PAULA_GOODS_SPRITE	= 2
+define PAULA_DEF_SPRITE		= 25
+define PAULA_RUNAWAY_SPRITE	= 2
+define PAULA_VICTORY_SPRITE	= 2
 
 
 //+=+=+=+=+=+= Commands =+=+=+=+=+=+=+
@@ -86,9 +112,13 @@ NPC:
 	unset(NESS_DEF_FLAG)
 	unset(NESS_DMG_FLAG)
 	unset(NESS_PSI_FLAG)
-	unset(NESS_STATUS_AFF_FLAG)
 	
-	//party_add(2)
+	unset(PAULA_ATK_FLAG)
+	unset(PAULA_DEF_FLAG)
+	unset(PAULA_DMG_FLAG)
+	unset(PAULA_PSI_FLAG)
+	
+	party_add(2)
 	//party_add(3)
 	//party_add(4)
 	//"[19 05 01 02 03]"
@@ -119,6 +149,13 @@ Test:
 	"@This is a test" next
 	eob
 	
+/* WARNING: DO NOT LET ENEMIES USE THE SAME BATTLE ACTION ID THAT ANY PARTY MEMBER USES.
+			Reason being is that you will soft lock your game because the game will wait
+			for a flag to be set during the text portion of the attack if the enemy uses
+			the same battle action. Each party member's battle action should be unique
+			so that the flags can be set when they do their regular attacks.
+*/
+
 Ness_Bash:
     sound(SND_HEROATTACK) "@{user} attacks! [03]"
 	set(NESS_ATK_FLAG)
@@ -162,18 +199,10 @@ SFX_SHOOT:
 Create_Party_Spr:
 	BowsprCC_Begin(0, 2)
 	BowsprCC_CreateSprite(1, CreateNessBattleSprLogic)
-	BowsprCC_CreateSprite(2, CreatePaulaBattleSpr)
+	BowsprCC_CreateSprite(2, CreatePaulaBattleSprLogic)
 	BowsprCC_CreateSprite(3, CreateJeffBattleSpr)
 	BowsprCC_CreateSprite(4, CreatePooBattleSpr)
-	BowsprCC_CreateSprite(264, NessCreateTinyGhost)
-	eob
 	
-Ness_Create_Mushroom:
-	BowsprCC_CreateSprite(226, NessCreateMushroom)
-	eob
-	
-Ness_Create_TinyGhost:
-	BowsprCC_CreateSprite(264, NessCreateTinyGhost)
 	eob
 
 //+=+=+=+=+=+= Action Scripts =+=+=+=+=+=+=+
@@ -198,7 +227,529 @@ loop:
 	m_jmp (loop)
 }	
 
-//+=+=+=+=+= NESS =+=+=+=+=+=+
+/////////////////////////////////////////////////////////////////
+
+/*
+WARNING: Mushroomizing or having the party being possessed too much will make the
+		 battle sprites have some parts of them being replaced by the tiny mushroom
+		 or lil ghost sprite, so make sure that your enemies don't mushroomized or possess
+		 too much.
+*/
+
+//=+=+=+=+=+ NESS ANIMATIONS +=+=+=+=+=
+
+Ness_Create_Mushroom:
+	BowsprCC_CreateSprite(226, NessCreateMushroom)
+	eob
+	
+Ness_Create_TinyGhost:
+	BowsprCC_CreateSprite(264, NessCreateTinyGhost)
+	eob
+
+NessCreateMushroom: {
+	Vittorio_bowspr_preamble
+	m_ontick_nop
+	m_priority(0)
+	
+	m_set_facing_anim(N, 0)
+	m_refresh_graphics
+	m_warp_to_sprite(NESS_IDLE_SPRITE)
+	m_add_ypos(-0x0E)
+	
+	m_set_result(PTY_BTLR_ADDR)
+	m_add_result(0x1E)
+	m_rtovar7		// Ness's Sprite Changing status
+
+Loop:
+	m_get_var7
+	m_get_mem8_at_result
+	m_and_result(0x01)
+	m_multijmp(2)
+		short End
+		short LoopBack
+	m_jmp (End)
+	
+LoopBack:
+	m_pause(1)
+	m_jmp(Loop)
+	
+End:
+	m_destroy_self
+}
+
+// Common Action Script function for Tiny Ghost circling around the player
+CalcTinyGhostPosition: {
+CheckYDirection:
+	m_get_var6
+	m_asmcall(Sine)	// Sine Function
+	m_asmcall(ASM_Divide16FromResult)
+	m_rtovar4
+	
+	m_get_var5
+	m_jne(GhostFloatYPos)
+	
+	GoingUp:				// This is when the ghost sprite is going up, usually goes down first
+		m_get_var4
+		m_xor_result(0xFFFF)
+		m_add_result(0x01)	// Two's Compliment to get negative number
+		m_rtovar4
+	
+	GhostFloatYPos:
+		m_get_var4
+		m_asmcall(ASM_ResultPlusVar0)
+		m_asmcall(ASM_SetObjYPosFromResult)
+
+		m_get_var6
+		m_add_result(1)
+		m_rtovar6
+	
+		m_and_result(0x80)
+		m_jeq(CheckXDirection)
+	
+	ChangeFloatingDirectionYPos:
+		m_get_var5
+		m_xor_result(0x01)
+		m_and_result(0x01)
+		m_rtovar5
+		m_set_var6(0)
+	
+CheckXDirection:
+	m_get_var3
+	m_asmcall(Sine)	// Sine Function
+	m_asmcall(ASM_Divide8FromResult)
+	m_rtovar4
+	
+	m_get_var2
+	m_jne(GhostFloatXPos)
+	
+	GoingLeft:				// This is when the ghost sprite is going left, usually goes right first
+		m_get_var4
+		m_xor_result(0xFFFF)
+		m_add_result(0x01)	// Two's Compliment to get negative number
+		m_rtovar4
+	
+	GhostFloatXPos:
+		m_get_var4
+		m_asmcall(ASM_ResultPlusVar1)
+		m_asmcall(ASM_SetObjXPosFromResult)
+
+		m_get_var3
+		m_add_result(1)
+		m_rtovar3
+	
+		m_and_result(0x80)
+		m_jeq(Return)
+	
+	ChangeFloatingDirectionXPos:
+		m_get_var2
+		m_xor_result(0x01)
+		m_and_result(0x01)
+		m_rtovar2
+		m_set_var3(0)
+
+Return:
+	m_rtl
+}
+
+NessCreateTinyGhost: {
+	Vittorio_bowspr_preamble
+	m_ontick_nop
+	m_priority(0)
+	
+	m_set_facing_anim(N, 0)
+	m_refresh_graphics
+	m_warp_to_sprite(NESS_IDLE_SPRITE)
+	m_add_ypos(-0x0E)
+	
+	m_set_result(PTY_BTLR_ADDR)
+	m_add_result(0x1E)
+	m_rtovar7		// Ness's Sprite Changing status
+	m_set_var6(0)	// Frame count for our Sine function in Y direction
+	m_set_var3(0x40)// Frame count for our Sine function in x direction
+	m_set_var5(0)	// Ghost Direction Flag to check to add or subtract y-pos from the sine function
+	m_set_var2(0)	// Ghost Direction Flag to check to add or subtract x-pos from the sine function
+	m_set_var4(0)	// Return Value from the Sine funciton
+	m_asmcall(ASM_GetObjYPosToResult)
+	m_rtovar0		// var0 is the initial position of the ghost sprite's y-Pos
+	m_asmcall(ASM_GetObjXPosToResult)
+	m_rtovar1		// var1 is the initial position of the ghost sprite's x-pos
+	
+Loop:
+	m_get_var7
+	m_get_mem8_at_result
+	m_and_result(0x02)
+	m_multijmp(3)
+		short End
+		short End
+		short Continue
+	m_jmp (End)
+	
+Continue:
+	m_jsl(CalcTinyGhostPosition)
+	
+LoopBack:
+	m_pause(1)
+	m_jmp(Loop)
+	
+End:
+	m_destroy_self
+}
+
+CreateNessBattleSprLogic: {
+	Vittorio_bowspr_preamble
+	m_ontick_nop
+	m_priority(3)
+	
+	m_get_mem16(0x988B)
+	m_and_result(0xFF)
+	m_add_result(-1)
+	m_jne(End)
+	
+	m_set_xpos(AS_NESS_X_POS)
+	m_set_ypos(AS_FRONT_ROW_Y_POS)
+	m_set_facing_anim(NE, 0)
+						
+	m_set_result(PTY_BTLR_ADDR)
+	m_rtovar7			// Var7 contains Ness's Battler address
+	m_set_result(0)	
+	m_rtovar6			// Var6 is Ness' possession/mushroomized status
+						// 0x01 = Mushroomized, 0x02 = Possessed
+	
+Loop:
+	m_get_flag(VICTORY_FLAG)
+	m_jne(Victory)
+	
+	m_pause(1)
+		
+Attack:
+	m_get_flag(NESS_ATK_FLAG)
+	m_jeq(Goods)
+	
+	m_unlock_text
+	
+	MOV_ChangeSpriteGroup(NESS_ATK_SPRITE)
+	NessAttackAnimation
+	
+	m_unset_flag(NESS_ATK_FLAG)
+	m_jmp(Loop_Back)
+	
+Goods:
+	m_get_flag(NESS_GOODS_FLAG)
+	m_jeq(Defend)
+	
+	MOV_ChangeSpriteGroup(NESS_GOODS_SPRITE)
+	
+	GoodsLockingWait:
+		m_get_flag(VICTORY_FLAG)
+		m_jne(Victory)
+	
+		NessGoodsAnimation
+		
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		m_multijmp(3)
+			short GoodsContinue
+			short GoodsUnconscious
+			short GoodsDiamondized
+			
+	GoodsContinue:
+		m_get_flag(NESS_GOODS_FLAG)
+		m_jne(GoodsLockingWait)
+		m_jmp(Loop_Back)
+		
+	GoodsUnconscious:
+		m_unset_flag(NESS_GOODS_FLAG)
+		m_jmp(Unconscious)
+
+	GoodsDiamondized:
+		m_unset_flag(NESS_GOODS_FLAG)
+		m_jmp(Diamondized)
+	
+Defend:
+	m_get_flag(NESS_DEF_FLAG)
+	m_jeq(PSI)
+	
+	MOV_ChangeSpriteGroup(NESS_DEF_SPRITE)
+	
+	DefendLockingWait:
+		m_get_flag(VICTORY_FLAG)
+		m_jne(Victory)
+	
+		NessDefendAnimation
+		
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		m_multijmp(3)
+			short DefendContinue
+			short DefendUnconscious
+			short DefendDiamondized
+			
+		DefendContinue:
+			m_get_flag(NESS_DEF_FLAG)
+			m_jne(DefendLockingWait)
+			m_jmp(Loop_Back)
+		
+		DefendUnconscious:
+			m_unset_flag(NESS_DEF_FLAG)
+			m_jmp(Unconscious)
+		
+		DefendDiamondized:
+			m_unset_flag(NESS_DEF_FLAG)
+			m_jmp(Diamondized)
+	
+PSI:
+	m_get_flag(NESS_PSI_FLAG)
+	m_jeq(RunAway)
+	
+	MOV_ChangeSpriteGroup(NESS_PSI_SPRITE)
+	
+	PSILockingWait:
+		m_get_flag(VICTORY_FLAG)
+		m_jne(Victory)	
+
+		NessPSIAnimation
+			
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		m_multijmp(3)
+			short PSIContinue
+			short PSIUnconscious
+			short PSIDiamondized
+		
+	PSIContinue:
+		m_get_flag(NESS_PSI_FLAG)
+		m_jne(PSILockingWait)
+		m_jmp(Loop_Back)
+	
+	PSIUnconscious:
+		m_unset_flag(NESS_PSI_FLAG)
+		m_jmp(Unconscious)
+		
+	PSIDiamondized:
+		m_unset_flag(NESS_PSI_FLAG)
+		m_jmp(Diamondized)
+	
+RunAway:
+	m_get_flag(PARTY_RUNAWAY_FLAG)
+	m_jeq(StatusAffiction)
+	
+	MOV_ChangeSpriteGroup(NESS_RUNAWAY_SPRITE)
+	
+	RunawayLockingWait:
+		m_get_flag(VICTORY_FLAG)
+		m_jne(Victory)
+	
+		NessRunawayAnimation
+		
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		m_multijmp(3)
+			short RunAwayContinue
+			short RunAwayUnconscious
+			short RunAwayDiamondized
+		
+	RunAwayContinue:
+		m_get_flag(PARTY_RUNAWAY_FLAG)
+		m_jne(RunawayLockingWait)
+		m_jmp(Loop_Back)
+		
+	RunAwayUnconscious:
+		m_jmp(Unconscious)
+		
+	RunAwayDiamondized:
+		m_jmp(Diamondized)
+	
+StatusAffiction:
+	CheckHomesickness:
+		m_get_var7
+		m_add_result(0x22)
+		m_get_mem8_at_result
+		m_jne(Homesickness)
+	
+	CheckCannotConcentrate:
+		m_get_var7
+		m_add_result(0x21)
+		m_get_mem8_at_result
+		m_jne(CannotConcentrate)
+		
+	CheckFeelingStrange:
+		m_get_var7
+		m_add_result(0x20)
+		m_get_mem8_at_result
+		m_jne(FeelingStrange)
+		
+	CheckInOverworldAffliction:
+		m_get_var7
+		m_add_result(0x1E)
+		m_get_mem8_at_result
+		m_multijmp(3)
+			short CheckInBattleAffliction
+			short Mashroomized
+			short Possessed
+		
+	CheckInBattleAffliction:
+		m_set_result(0)
+		m_rtovar6
+		
+		m_get_var7
+		m_add_result(0x1F)
+		m_get_mem8_at_result
+		m_multijmp(5)
+			short CheckPermanentAffliction
+			short Sleeping
+			short Crying
+			short Immobilized
+			short Solidified
+		
+	CheckPermanentAffliction:
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		m_jeq(Normal)
+		m_multijmp(8)
+			short Normal
+			short Unconscious
+			short Diamondized
+			short Paralized
+			short Nauseous
+			short Poisoned
+			short Sunstroke
+			short Cold
+	
+Normal:
+	MOV_ChangeSpriteGroup(NESS_IDLE_SPRITE)
+	NessIdleAnimation
+	m_jmp(Loop_Back)
+	
+Unconscious:
+	MOV_ChangeSpriteGroup(NESS_UNCON_SPRITE)
+	NessUnconsciousAnimation
+	m_jmp(Loop_Back)
+	
+Diamondized:
+	MOV_ChangeSpriteGroup(NESS_DIA_SPRITE)
+	NessDiamondizedAnimation
+	m_jmp(Loop_Back)
+
+Paralized:
+	MOV_ChangeSpriteGroup(NESS_PARA_SPRITE)
+	NessParalizedAnimation
+	m_jmp(Loop_Back)
+
+Nauseous:
+	MOV_ChangeSpriteGroup(NESS_NAUS_SPRITE)
+	NessNauseousAnimation
+	m_jmp(Loop_Back)
+	
+Poisoned:
+	MOV_ChangeSpriteGroup(NESS_POIS_SPRITE)
+	NessPoisonedAnimation
+	m_jmp(Loop_Back)
+
+Sunstroke:
+	MOV_ChangeSpriteGroup(NESS_SUNS_SPRITE)
+	NessSunstrokeAnimation
+	m_jmp(Loop_Back)
+
+Cold:
+	MOV_ChangeSpriteGroup(NESS_COLD_SPRITE)
+	NessColdAnimation
+	m_jmp(Loop_Back)
+
+Mashroomized:
+	m_get_var6
+	m_and_result(0x01)
+	m_jne(Mashroomized_Continue)
+	
+	m_textcall2(Ness_Create_Mushroom)
+	m_get_var6
+	m_or_result(0x01)
+	m_rtovar6
+	
+	Mashroomized_Continue:
+		MOV_ChangeSpriteGroup(NESS_MUSH_SPRITE)
+		NessMashroomizedAnimation
+		
+	m_jmp(Loop_Back)
+
+Possessed:
+	m_get_var6
+	m_and_result(0x02)
+	m_jne(Possessed_Continue)
+	
+	m_textcall2(Ness_Create_TinyGhost)
+	m_get_var6
+	m_or_result(0x02)
+	m_rtovar6
+
+	Possessed_Continue:
+		MOV_ChangeSpriteGroup(NESS_POSS_SPRITE)
+		NessPossessedAnimation
+	
+	m_jmp(Loop_Back)
+
+Sleeping:
+	MOV_ChangeSpriteGroup(NESS_SLEEP_SPRITE)
+	NessSleepingAnimation
+	m_jmp(Loop_Back)
+
+Crying:
+	MOV_ChangeSpriteGroup(NESS_CRY_SPRITE)
+	NessCryingAnimation
+	m_jmp(Loop_Back)
+
+Immobilized:
+	MOV_ChangeSpriteGroup(NESS_IMMOB_SPRITE)
+	NessImmobilizedAnimation
+	m_jmp(Loop_Back)
+
+Solidified:
+	MOV_ChangeSpriteGroup(NESS_SOLID_SPRITE)
+	NessSolidifedAnimation
+	m_jmp(Loop_Back)
+
+FeelingStrange:
+	MOV_ChangeSpriteGroup(NESS_FEELS_SPRITE)
+	NessFeelingStrangeAnimation
+	m_jmp(Loop_Back)
+
+CannotConcentrate:
+	MOV_ChangeSpriteGroup(NESS_CNTCON_SPRITE)
+	NessCannotConcentrateAnimation
+	m_jmp(Loop_Back)
+
+Homesickness:
+	MOV_ChangeSpriteGroup(NESS_HMSIK_SPRITE)
+	NessHomesicknessAnimation
+	m_jmp(Loop_Back)
+	
+Loop_Back:
+	m_jmp(Loop)
+	
+Victory:
+	// Turn around to face camera
+	m_set_facing_anim(NE, 0)
+	m_pause(5)
+	m_set_facing_anim(E, 0)
+	m_pause(5)
+	m_set_facing_anim(SE, 0)
+	m_pause(5)
+	m_set_facing_anim(S, 0)
+	m_pause(5)
+	
+	MOV_ChangeSpriteGroup(NESS_VICTORY_SPRITE)
+	
+	VictoryAnimLoop:
+		NessVictoryAnimation
+		m_jmp(VictoryAnimLoop)
+
+End:
+	m_destroy_self
+}
 
 define NessIdleAnimation = {	
 	m_set_facing_anim(NE, 0)
@@ -344,27 +895,31 @@ define NessVictoryAnimation = {
 	m_pause(1)
 }
 
-/////////////////////////////////////////////////////////////////
+//+=+=+=+=+= PAULA ANIMATIONS =+=+=+=+=+=+
 
-/*
-WARNING: Mushroomizing or having the party being possessed too much will make the
-		 battle sprites have some parts of them being replaced by the tiny mushroom
-		 or lil ghost sprite, so make sure that your enemies don't mushroomized or possess
-		 too much.
-*/
-NessCreateMushroom: {
+Paula_Create_Mushroom:
+	BowsprCC_CreateSprite(226, PaulaCreateMushroom)
+	eob
+	
+Paula_Create_TinyGhost:
+	BowsprCC_CreateSprite(264, PaulaCreateTinyGhost)
+	eob
+
+
+PaulaCreateMushroom: {
 	Vittorio_bowspr_preamble
 	m_ontick_nop
 	m_priority(0)
 	
 	m_set_facing_anim(N, 0)
 	m_refresh_graphics
-	m_warp_to_sprite(NESS_IDLE_SPRITE)
+	m_warp_to_sprite(PAULA_IDLE_SPRITE)
 	m_add_ypos(-0x0E)
 	
 	m_set_result(PTY_BTLR_ADDR)
+	m_add_result(0x4E)	// Offset to get Paula's data in battle
 	m_add_result(0x1E)
-	m_rtovar7		// Ness's Sprite Changing status
+	m_rtovar7		// Paula's Sprite Changing status
 
 Loop:
 	m_get_var7
@@ -383,93 +938,20 @@ End:
 	m_destroy_self
 }
 
-// Common Action Script function for Tiny Ghost circling around the player
-CalcTinyGhostPosition: {
-CheckYDirection:
-	m_get_var6
-	m_asmcall(Sine)	// Sine Function
-	m_asmcall(ASM_Divide16FromResult)
-	m_rtovar4
-	
-	m_get_var5
-	m_jne(GhostFloatYPos)
-	
-	GoingUp:				// This is when the ghost sprite is going up, usually goes down first
-		m_get_var4
-		m_xor_result(0xFFFF)
-		m_add_result(0x01)	// Two's Compliment to get negative number
-		m_rtovar4
-	
-	GhostFloatYPos:
-		m_get_var4
-		m_asmcall(ASM_ResultPlusVar0)
-		m_asmcall(ASM_SetObjYPosFromResult)
-
-		m_get_var6
-		m_add_result(1)
-		m_rtovar6
-	
-		m_and_result(0x80)
-		m_jeq(CheckXDirection)
-	
-	ChangeFloatingDirectionYPos:
-		m_get_var5
-		m_xor_result(0x01)
-		m_and_result(0x01)
-		m_rtovar5
-		m_set_var6(0)
-	
-CheckXDirection:
-	m_get_var3
-	m_asmcall(Sine)	// Sine Function
-	m_asmcall(ASM_Divide8FromResult)
-	m_rtovar4
-	
-	m_get_var2
-	m_jne(GhostFloatXPos)
-	
-	GoingLeft:				// This is when the ghost sprite is going left, usually goes right first
-		m_get_var4
-		m_xor_result(0xFFFF)
-		m_add_result(0x01)	// Two's Compliment to get negative number
-		m_rtovar4
-	
-	GhostFloatXPos:
-		m_get_var4
-		m_asmcall(ASM_ResultPlusVar1)
-		m_asmcall(ASM_SetObjXPosFromResult)
-
-		m_get_var3
-		m_add_result(1)
-		m_rtovar3
-	
-		m_and_result(0x80)
-		m_jeq(Return)
-	
-	ChangeFloatingDirectionXPos:
-		m_get_var2
-		m_xor_result(0x01)
-		m_and_result(0x01)
-		m_rtovar2
-		m_set_var3(0)
-
-Return:
-	m_rtl
-}
-
-NessCreateTinyGhost: {
+PaulaCreateTinyGhost: {
 	Vittorio_bowspr_preamble
 	m_ontick_nop
 	m_priority(0)
 	
 	m_set_facing_anim(N, 0)
 	m_refresh_graphics
-	m_warp_to_sprite(NESS_IDLE_SPRITE)
+	m_warp_to_sprite(PAULA_IDLE_SPRITE)
 	m_add_ypos(-0x0E)
 	
 	m_set_result(PTY_BTLR_ADDR)
+	m_add_result(0x4E)	// Paula's offset to the address
 	m_add_result(0x1E)
-	m_rtovar7		// Ness's Sprite Changing status
+	m_rtovar7		// Paula's Sprite Changing status
 	m_set_var6(0)	// Frame count for our Sine function in Y direction
 	m_set_var3(0x40)// Frame count for our Sine function in x direction
 	m_set_var5(0)	// Ghost Direction Flag to check to add or subtract y-pos from the sine function
@@ -500,7 +982,7 @@ End:
 	m_destroy_self
 }
 
-CreateNessBattleSprLogic: {
+CreatePaulaBattleSprLogic: {
 	Vittorio_bowspr_preamble
 	m_ontick_nop
 	m_priority(3)
@@ -510,12 +992,16 @@ CreateNessBattleSprLogic: {
 	m_add_result(-1)
 	m_jne(End)
 	
-	m_set_xpos(AS_NESS_X_POS)
-	m_set_ypos(AS_FRONT_ROW_Y_POS)
+	m_set_xpos(AS_PAULA_X_POS)
+	m_set_ypos(AS_BACK_ROW_Y_POS)
 	m_set_facing_anim(NE, 0)
 						
 	m_set_result(PTY_BTLR_ADDR)
-	m_rtovar7			// Var7 contains Ness's Battler address
+	m_add_result(0x4E)
+	m_rtovar7			// Var7 contains Paula's Battler address
+	m_set_result(0)	
+	m_rtovar6			// Var6 is Paula's possession/mushroomized status
+						// 0x01 = Mushroomized, 0x02 = Possessed
 	
 Loop:
 	m_get_flag(VICTORY_FLAG)
@@ -524,123 +1010,131 @@ Loop:
 	m_pause(1)
 		
 Attack:
-	m_get_flag(NESS_ATK_FLAG)
+	m_get_flag(PAULA_ATK_FLAG)
 	m_jeq(Goods)
 	
 	m_unlock_text
 	
-	MOV_ChangeSpriteGroup(NESS_ATK_SPRITE)
-	NessAttackAnimation
+	MOV_ChangeSpriteGroup(PAULA_ATK_SPRITE)
+	PaulaAttackAnimation
 	
-	m_unset_flag(NESS_ATK_FLAG)
+	m_unset_flag(PAULA_ATK_FLAG)
 	m_jmp(Loop_Back)
 	
 Goods:
-	m_get_flag(NESS_GOODS_FLAG)
+	m_get_flag(PAULA_GOODS_FLAG)
 	m_jeq(Defend)
 	
-	MOV_ChangeSpriteGroup(NESS_GOODS_SPRITE)
+	MOV_ChangeSpriteGroup(PAULA_GOODS_SPRITE)
 	
 	GoodsLockingWait:
-		NessGoodsAnimation
+		m_get_flag(VICTORY_FLAG)
+		m_jne(Victory)
+	
+		PaulaGoodsAnimation
 		
 		m_get_var7
 		m_add_result(0x1D)
 		m_get_mem8_at_result
-		//m_jeq(Normal)
 		m_multijmp(3)
 			short GoodsContinue
 			short GoodsUnconscious
 			short GoodsDiamondized
 			
 	GoodsContinue:
-		m_get_flag(NESS_GOODS_FLAG)
+		m_get_flag(PAULA_GOODS_FLAG)
 		m_jne(GoodsLockingWait)
 		m_jmp(Loop_Back)
 		
 	GoodsUnconscious:
-		m_unset_flag(NESS_GOODS_FLAG)
+		m_unset_flag(PAULA_GOODS_FLAG)
 		m_jmp(Unconscious)
 
 	GoodsDiamondized:
-		m_unset_flag(NESS_GOODS_FLAG)
+		m_unset_flag(PAULA_GOODS_FLAG)
 		m_jmp(Diamondized)
 	
 Defend:
-	m_get_flag(NESS_DEF_FLAG)
+	m_get_flag(PAULA_DEF_FLAG)
 	m_jeq(PSI)
 	
-	MOV_ChangeSpriteGroup(NESS_DEF_SPRITE)
+	MOV_ChangeSpriteGroup(PAULA_DEF_SPRITE)
 	
 	DefendLockingWait:
-		NessDefendAnimation
+		m_get_flag(VICTORY_FLAG)
+		m_jne(Victory)
+	
+		PaulaDefendAnimation
 		
 		m_get_var7
 		m_add_result(0x1D)
 		m_get_mem8_at_result
-		//m_jeq(Normal)
 		m_multijmp(3)
 			short DefendContinue
 			short DefendUnconscious
 			short DefendDiamondized
 			
 		DefendContinue:
-			m_get_flag(NESS_DEF_FLAG)
+			m_get_flag(PAULA_DEF_FLAG)
 			m_jne(DefendLockingWait)
 			m_jmp(Loop_Back)
 		
 		DefendUnconscious:
-			m_unset_flag(NESS_DEF_FLAG)
+			m_unset_flag(PAULA_DEF_FLAG)
 			m_jmp(Unconscious)
 		
 		DefendDiamondized:
-			m_unset_flag(NESS_DEF_FLAG)
+			m_unset_flag(PAULA_DEF_FLAG)
 			m_jmp(Diamondized)
 	
 PSI:
-	m_get_flag(NESS_PSI_FLAG)
+	m_get_flag(PAULA_PSI_FLAG)
 	m_jeq(RunAway)
 	
-	MOV_ChangeSpriteGroup(NESS_PSI_SPRITE)
+	MOV_ChangeSpriteGroup(PAULA_PSI_SPRITE)
 	
 	PSILockingWait:
-		NessPSIAnimation
+		m_get_flag(VICTORY_FLAG)
+		m_jne(Victory)
+	
+		PaulaPSIAnimation
 			
 		m_get_var7
 		m_add_result(0x1D)
 		m_get_mem8_at_result
-		//m_jeq(Normal)
 		m_multijmp(3)
 			short PSIContinue
 			short PSIUnconscious
 			short PSIDiamondized
 		
 	PSIContinue:
-		m_get_flag(NESS_PSI_FLAG)
+		m_get_flag(PAULA_PSI_FLAG)
 		m_jne(PSILockingWait)
 		m_jmp(Loop_Back)
 	
 	PSIUnconscious:
-		m_unset_flag(NESS_PSI_FLAG)
+		m_unset_flag(PAULA_PSI_FLAG)
 		m_jmp(Unconscious)
 		
 	PSIDiamondized:
-		m_unset_flag(NESS_PSI_FLAG)
+		m_unset_flag(PAULA_PSI_FLAG)
 		m_jmp(Diamondized)
 	
 RunAway:
 	m_get_flag(PARTY_RUNAWAY_FLAG)
 	m_jeq(StatusAffiction)
 	
-	MOV_ChangeSpriteGroup(NESS_RUNAWAY_SPRITE)
+	MOV_ChangeSpriteGroup(PAULA_RUNAWAY_SPRITE)
 	
 	RunawayLockingWait:
-		NessRunawayAnimation
+		m_get_flag(VICTORY_FLAG)
+		m_jne(Victory)
+	
+		PaulaRunawayAnimation
 		
 		m_get_var7
 		m_add_result(0x1D)
 		m_get_mem8_at_result
-		//m_jeq(Normal)
 		m_multijmp(3)
 			short RunAwayContinue
 			short RunAwayUnconscious
@@ -712,89 +1206,110 @@ StatusAffiction:
 			short Cold
 	
 Normal:
-	MOV_ChangeSpriteGroup(NESS_IDLE_SPRITE)
-	//m_sound(73)
-	NessIdleAnimation
+	MOV_ChangeSpriteGroup(PAULA_IDLE_SPRITE)
+	PaulaIdleAnimation
 	m_jmp(Loop_Back)
 	
 Unconscious:
-	MOV_ChangeSpriteGroup(NESS_UNCON_SPRITE)
-	NessUnconsciousAnimation
+	MOV_ChangeSpriteGroup(PAULA_UNCON_SPRITE)
+	PaulaUnconsciousAnimation
 	m_jmp(Loop_Back)
 	
 Diamondized:
-	MOV_ChangeSpriteGroup(NESS_DIA_SPRITE)
-	NessDiamondizedAnimation
+	MOV_ChangeSpriteGroup(PAULA_DIA_SPRITE)
+	PaulaDiamondizedAnimation
 	m_jmp(Loop_Back)
 
 Paralized:
-	MOV_ChangeSpriteGroup(NESS_PARA_SPRITE)
-	NessParalizedAnimation
+	MOV_ChangeSpriteGroup(PAULA_PARA_SPRITE)
+	PaulaParalizedAnimation
 	m_jmp(Loop_Back)
 
 Nauseous:
-	MOV_ChangeSpriteGroup(NESS_NAUS_SPRITE)
-	NessNauseousAnimation
+	MOV_ChangeSpriteGroup(PAULA_NAUS_SPRITE)
+	PaulaNauseousAnimation
 	m_jmp(Loop_Back)
 	
 Poisoned:
-	MOV_ChangeSpriteGroup(NESS_POIS_SPRITE)
-	NessPoisonedAnimation
+	MOV_ChangeSpriteGroup(PAULA_POIS_SPRITE)
+	PaulaPoisonedAnimation
 	m_jmp(Loop_Back)
 
 Sunstroke:
-	MOV_ChangeSpriteGroup(NESS_SUNS_SPRITE)
-	NessSunstrokeAnimation
+	MOV_ChangeSpriteGroup(PAULA_SUNS_SPRITE)
+	PaulaSunstrokeAnimation
 	m_jmp(Loop_Back)
 
 Cold:
-	MOV_ChangeSpriteGroup(NESS_COLD_SPRITE)
-	NessColdAnimation
+	MOV_ChangeSpriteGroup(PAULA_COLD_SPRITE)
+	PaulaColdAnimation
 	m_jmp(Loop_Back)
 
 Mashroomized:
-	MOV_ChangeSpriteGroup(NESS_MUSH_SPRITE)
-	NessMashroomizedAnimation
+	m_get_var6
+	m_and_result(0x01)
+	m_jne(Mashroomized_Continue)
+	
+	m_textcall2(Paula_Create_Mushroom)
+	m_get_var6
+	m_or_result(0x01)
+	m_rtovar6
+	
+	Mashroomized_Continue:
+		MOV_ChangeSpriteGroup(PAULA_MUSH_SPRITE)
+		PaulaMashroomizedAnimation
+		
 	m_jmp(Loop_Back)
 
 Possessed:
-	MOV_ChangeSpriteGroup(NESS_POSS_SPRITE)
-	NessPossessedAnimation
+	m_get_var6
+	m_and_result(0x02)
+	m_jne(Possessed_Continue)
+	
+	m_textcall2(Paula_Create_TinyGhost)
+	m_get_var6
+	m_or_result(0x02)
+	m_rtovar6
+
+	Possessed_Continue:
+		MOV_ChangeSpriteGroup(PAULA_POSS_SPRITE)
+		PaulaPossessedAnimation
+	
 	m_jmp(Loop_Back)
 
 Sleeping:
-	MOV_ChangeSpriteGroup(NESS_SLEEP_SPRITE)
-	NessSleepingAnimation
+	MOV_ChangeSpriteGroup(PAULA_SLEEP_SPRITE)
+	PaulaSleepingAnimation
 	m_jmp(Loop_Back)
 
 Crying:
-	MOV_ChangeSpriteGroup(NESS_CRY_SPRITE)
-	NessCryingAnimation
+	MOV_ChangeSpriteGroup(PAULA_CRY_SPRITE)
+	PaulaCryingAnimation
 	m_jmp(Loop_Back)
 
 Immobilized:
-	MOV_ChangeSpriteGroup(NESS_IMMOB_SPRITE)
-	NessImmobilizedAnimation
+	MOV_ChangeSpriteGroup(PAULA_IMMOB_SPRITE)
+	PaulaImmobilizedAnimation
 	m_jmp(Loop_Back)
 
 Solidified:
-	MOV_ChangeSpriteGroup(NESS_SOLID_SPRITE)
-	NessSolidifedAnimation
+	MOV_ChangeSpriteGroup(PAULA_SOLID_SPRITE)
+	PaulaSolidifedAnimation
 	m_jmp(Loop_Back)
 
 FeelingStrange:
-	MOV_ChangeSpriteGroup(NESS_FEELS_SPRITE)
-	NessFeelingStrangeAnimation
+	MOV_ChangeSpriteGroup(PAULA_FEELS_SPRITE)
+	PaulaFeelingStrangeAnimation
 	m_jmp(Loop_Back)
 
 CannotConcentrate:
-	MOV_ChangeSpriteGroup(NESS_CNTCON_SPRITE)
-	NessCannotConcentrateAnimation
+	MOV_ChangeSpriteGroup(PAULA_CNTCON_SPRITE)
+	PaulaCannotConcentrateAnimation
 	m_jmp(Loop_Back)
 
 Homesickness:
-	MOV_ChangeSpriteGroup(NESS_HMSIK_SPRITE)
-	NessHomesicknessAnimation
+	MOV_ChangeSpriteGroup(PAULA_HMSIK_SPRITE)
+	PaulaHomesicknessAnimation
 	m_jmp(Loop_Back)
 	
 Loop_Back:
@@ -811,51 +1326,29 @@ Victory:
 	m_set_facing_anim(S, 0)
 	m_pause(5)
 	
-	MOV_ChangeSpriteGroup(NESS_VICTORY_SPRITE)
+	MOV_ChangeSpriteGroup(PAULA_VICTORY_SPRITE)
 	
 	VictoryAnimLoop:
-		NessVictoryAnimation
+		PaulaVictoryAnimation
 		m_jmp(VictoryAnimLoop)
 
 End:
 	m_destroy_self
 }
 
-//+=+=+=+=+= PAULA =+=+=+=+=+=+
-
-CreatePaulaBattleSpr: {
-	Vittorio_bowspr_preamble
-	m_ontick_nop
-	m_priority(0)
-	
-	m_get_mem16(0x988B)
-	m_and_result(0xFF)
-	m_add_result(-2)
-	m_jeq(Paula_Spr)
-	
-	m_get_mem16(0x988C)
-	m_and_result(0xFF)
-	m_add_result(-2)
-	m_jne(End)
-	
-Paula_Spr:
-	m_set_xpos(AS_PAULA_X_POS)
-	m_set_ypos(AS_BACK_ROW_Y_POS)
-	m_set_facing_anim(8, 0)
-	
-Loop:
+define PaulaIdleAnimation = {	
+	m_set_facing_anim(NE, 0)
 	m_pause(1)
+}
+
+define PaulaAffIdleAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaAttackAnimation = {
+	m_set_facing_anim(NE, 0)
 	
-	m_get_flag(PAULA_ATK_FLAG)
-	m_add_result(-1)
-	m_jne(Loop_Back)
-	
-	// Paula is attacking
-	m_unset_flag(PAULA_ATK_FLAG)
-	m_textcall2(SFX_BASH)
-	m_unlock_text
-	
-	// Attack Sprite Animation
 	m_refresh_graphics_frame1
 	m_pause(10)
 	m_refresh_graphics_frame0
@@ -868,14 +1361,123 @@ Loop:
 	m_pause(10)
 	m_refresh_graphics_frame0
 	m_pause(10)
-	
-	m_jmp(Loop_Back)
-	
-Loop_Back:
-	m_jmp(Loop)
-	
-End:
-	m_destroy_self
+}
+
+define PaulaGoodsAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+}
+
+define PaulaDefendAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+}
+
+define PaulaPSIAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+}
+
+define PaulaRunawayAnimation = {
+	m_set_facing_anim(SW, 0)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+}
+
+define PaulaUnconsciousAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaDiamondizedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaParalizedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaNauseousAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaPoisonedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaSunstrokeAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaColdAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaMashroomizedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaPossessedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaSleepingAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaCryingAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaImmobilizedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaSolidifedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaFeelingStrangeAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaCannotConcentrateAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaHomesicknessAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PaulaVictoryAnimation = {
+	m_set_facing_anim(S, 0)
+	m_pause(1)
 }
 
 //+=+=+=+=+= JEFF =+=+=+=+=+=+
