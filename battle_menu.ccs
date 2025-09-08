@@ -18,21 +18,6 @@ define battle_menu = {
   do_menu(48, CANCELLABLE, { // 48 is which window. Make sure the 48 at the bottom of this define matches
     reset_action() // Leave this line in to prevent weird bugs
 	
-	// Unset these flags here to reset character animations when it becomes the player's turn again
-	set_flag(PAULA_DEF_FLAG, 0)
-	set_flag(PAULA_PSI_FLAG, 0)
-	set_flag(PAULA_GOODS_FLAG, 0)
-	set_flag(PAULA_PRAY_FLAG, 0)
-		
-	set_flag(JEFF_DEF_FLAG, 0)
-	set_flag(JEFF_SPY_FLAG, 0)
-	set_flag(JEFF_GOODS_FLAG, 0)
-		
-	set_flag(POO_DEF_FLAG, 0)
-	set_flag(POO_PSI_FLAG, 0)
-	set_flag(POO_GOODS_FLAG, 0)
-	set_flag(POO_MIRROR_FLAG, 0)
-	
     // Rest of this is editable; it's pre-configured to mimic the original menu decently well.
     set_window_title_to_character_name(48)
 	
@@ -42,17 +27,46 @@ define battle_menu = {
 		set_flag(NESS_PSI_FLAG, 0)
 		set_flag(NESS_GOODS_FLAG, 0)
 		set_flag(PARTY_RUNAWAY_FLAG, 0)
+		
+		set_flag(PAULA_DEF_FLAG, 0)
+		set_flag(PAULA_PSI_FLAG, 0)
+		set_flag(PAULA_GOODS_FLAG, 0)
+		set_flag(PAULA_PRAY_FLAG, 0)
+		
+		set_flag(JEFF_DEF_FLAG, 0)
+		set_flag(JEFF_SPY_FLAG, 0)
+		set_flag(JEFF_GOODS_FLAG, 0)
+		
+		set_flag(POO_DEF_FLAG, 0)
+		set_flag(POO_PSI_FLAG, 0)
+		set_flag(POO_GOODS_FLAG, 0)
+		set_flag(POO_MIRROR_FLAG, 0)
+		
 	})
 	if_character_id(2, {
 		set_flag(PAULA_DEF_FLAG, 0)
 		set_flag(PAULA_PSI_FLAG, 0)
 		set_flag(PAULA_GOODS_FLAG, 0)
 		set_flag(PAULA_PRAY_FLAG, 0)
+		
+		set_flag(JEFF_DEF_FLAG, 0)
+		set_flag(JEFF_SPY_FLAG, 0)
+		set_flag(JEFF_GOODS_FLAG, 0)
+		
+		set_flag(POO_DEF_FLAG, 0)
+		set_flag(POO_PSI_FLAG, 0)
+		set_flag(POO_GOODS_FLAG, 0)
+		set_flag(POO_MIRROR_FLAG, 0)
 	})
 	if_character_id(3, {
 		set_flag(JEFF_DEF_FLAG, 0)
 		set_flag(JEFF_SPY_FLAG, 0)
 		set_flag(JEFF_GOODS_FLAG, 0)
+		
+		set_flag(POO_DEF_FLAG, 0)
+		set_flag(POO_PSI_FLAG, 0)
+		set_flag(POO_GOODS_FLAG, 0)
+		set_flag(POO_MIRROR_FLAG, 0)
 	})
 	if_character_id(4, {
 		set_flag(POO_DEF_FLAG, 0)
@@ -182,7 +196,8 @@ define battle_menu = {
     })
     if_character_id(3, {
       menu_option("Spy", 0, 1, {
-        set_action(6)
+        set_flag(JEFF_SPY_FLAG, 1)
+		set_action(6)
         ret_target()
       })
     })
