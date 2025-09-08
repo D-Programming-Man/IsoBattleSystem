@@ -24,6 +24,9 @@ define AS_BACK_ROW_Y_POS	= 0x88
 define CURRENT_PARTY_ADDR 	= 0x988B	// length 7 Bytes
 define PTY_BTLR_ADDR		= 0x9FAC
 define PTY_BTLR_STRUCT_SIZE = 0x4E
+define POO_MIRROR_TURN_COUNT= 0xAA62
+define MIRROR_ENEMY_ID		= 0xAA12
+define ENEMY_CONFIG_TABLE 	= 0xD59589
 
 define TIME_ACT_TO_IDLE		= 1			// In Frames
 
@@ -88,6 +91,7 @@ define PAULA_ATK_SPRITE		= 13
 define PAULA_PSI_SPRITE		= 2
 define PAULA_GOODS_SPRITE	= 2
 define PAULA_DEF_SPRITE		= 25
+define PAULA_PRAY_SPRITE	= 2
 define PAULA_RUNAWAY_SPRITE	= 2
 define PAULA_VICTORY_SPRITE	= 2
 
@@ -119,6 +123,32 @@ define JEFF_RUNAWAY_SPRITE	= 3
 define JEFF_VICTORY_SPRITE	= 3
 
 
+//+=+=+= Poo's Sprite Group Defines =+=+=+
+define POO_IDLE_SPRITE 		= 4
+define POO_UNCON_SPRITE		= 11
+define POO_DIA_SPRITE 		= 12
+define POO_PARA_SPRITE		= 13
+define POO_NAUS_SPRITE		= 4
+define POO_POIS_SPRITE		= 4
+define POO_SUNS_SPRITE		= 4
+define POO_COLD_SPRITE		= 4
+define POO_MUSH_SPRITE		= 4
+define POO_POSS_SPRITE		= 4
+define POO_SLEEP_SPRITE		= 16
+define POO_CRY_SPRITE		= 4
+define POO_IMMOB_SPRITE		= 13
+define POO_SOLID_SPRITE		= 13
+define POO_FEELS_SPRITE		= 4
+define POO_CNTCON_SPRITE	= 4
+define POO_HMSIK_SPRITE		= 4
+
+define POO_ATK_SPRITE		= 13
+define POO_PSI_SPRITE		= 4
+define POO_MIRROR_SPRITE	= 106
+define POO_GOODS_SPRITE		= 4
+define POO_DEF_SPRITE		= 25
+define POO_RUNAWAY_SPRITE	= 4
+define POO_VICTORY_SPRITE	= 4
 
 //+=+=+=+=+=+= Commands =+=+=+=+=+=+=+
 // Tie sprite position relative to the correct layer (windows layer) based on BGMODE (0x000F).
@@ -140,22 +170,27 @@ NPC:
 	set(DISABLE_SWIRL_FLAG)
 	unset(NESS_ATK_FLAG)
 	unset(NESS_DEF_FLAG)
-	unset(NESS_DMG_FLAG)
 	unset(NESS_PSI_FLAG)
+	unset(NESS_GOODS_FLAG)
 	
 	unset(PAULA_ATK_FLAG)
 	unset(PAULA_DEF_FLAG)
-	unset(PAULA_DMG_FLAG)
 	unset(PAULA_PSI_FLAG)
+	unset(PAULA_GOODS_FLAG)
 	
 	unset(JEFF_ATK_FLAG)
 	unset(JEFF_DEF_FLAG)
-	unset(JEFF_DMG_FLAG)
 	unset(JEFF_SPY_FLAG)
+	unset(JEFF_GOODS_FLAG)
+	
+	unset(POO_ATK_FLAG)
+	unset(POO_DEF_FLAG)
+	unset(POO_PSI_FLAG)
+	unset(POO_GOODS_FLAG)
 	
 	party_add(2)
 	party_add(3)
-	//party_add(4)
+	party_add(4)
 	//"[19 05 01 02 03]"
 	music(0x82)
 	battle(171)
@@ -220,14 +255,6 @@ Jeff_Shoot:
 	set(JEFF_ATK_FLAG)
 	wait_for_action
 	eob
-	
-SFX_BASH:
-	sound(SND_BASH)
-	eob
-	
-SFX_SHOOT:
-	sound(SND_SHOOT)
-	eob
 
 // NOTE: Order matters on which spirite gets loaded because the first one sets up
 //       the palettes for the rest of the other characters to use
@@ -236,7 +263,7 @@ Create_Party_Spr:
 	BowsprCC_CreateSprite(1, CreateNessBattleSprLogic)
 	BowsprCC_CreateSprite(2, CreatePaulaBattleSprLogic)
 	BowsprCC_CreateSprite(3, CreateJeffBattleSprLogic)
-	BowsprCC_CreateSprite(4, CreatePooBattleSpr)
+	BowsprCC_CreateSprite(4, CreatePooBattleSprLogic)
 	
 	eob
 
@@ -316,79 +343,6 @@ End:
 	m_destroy_self
 }
 
-// Common Action Script function for Tiny Ghost circling around the player
-CalcTinyGhostPosition: {
-CheckYDirection:
-	m_get_var6
-	m_asmcall(Sine)	// Sine Function
-	m_asmcall(ASM_Divide16FromResult)
-	m_rtovar4
-	
-	m_get_var5
-	m_jne(GhostFloatYPos)
-	
-	GoingUp:				// This is when the ghost sprite is going up, usually goes down first
-		m_get_var4
-		m_xor_result(0xFFFF)
-		m_add_result(0x01)	// Two's Compliment to get negative number
-		m_rtovar4
-	
-	GhostFloatYPos:
-		m_get_var4
-		m_asmcall(ASM_ResultPlusVar0)
-		m_asmcall(ASM_SetObjYPosFromResult)
-
-		m_get_var6
-		m_add_result(1)
-		m_rtovar6
-	
-		m_and_result(0x80)
-		m_jeq(CheckXDirection)
-	
-	ChangeFloatingDirectionYPos:
-		m_get_var5
-		m_xor_result(0x01)
-		m_and_result(0x01)
-		m_rtovar5
-		m_set_var6(0)
-	
-CheckXDirection:
-	m_get_var3
-	m_asmcall(Sine)	// Sine Function
-	m_asmcall(ASM_Divide8FromResult)
-	m_rtovar4
-	
-	m_get_var2
-	m_jne(GhostFloatXPos)
-	
-	GoingLeft:				// This is when the ghost sprite is going left, usually goes right first
-		m_get_var4
-		m_xor_result(0xFFFF)
-		m_add_result(0x01)	// Two's Compliment to get negative number
-		m_rtovar4
-	
-	GhostFloatXPos:
-		m_get_var4
-		m_asmcall(ASM_ResultPlusVar1)
-		m_asmcall(ASM_SetObjXPosFromResult)
-
-		m_get_var3
-		m_add_result(1)
-		m_rtovar3
-	
-		m_and_result(0x80)
-		m_jeq(Return)
-	
-	ChangeFloatingDirectionXPos:
-		m_get_var2
-		m_xor_result(0x01)
-		m_and_result(0x01)
-		m_rtovar2
-		m_set_var3(0)
-
-Return:
-	m_rtl
-}
 
 NessCreateTinyGhost: {
 	Vittorio_bowspr_preamble
@@ -424,10 +378,10 @@ Loop:
 	m_jmp (End)
 	
 Continue:
-	m_jsl(CalcTinyGhostPosition)
+	m_asmcall(ASM_CalcTinyGhostPos)
 	
 LoopBack:
-	m_pause(1)
+	m_pause(2)
 	m_jmp(Loop)
 	
 End:
@@ -1011,10 +965,10 @@ Loop:
 	m_jmp (End)
 	
 Continue:
-	m_jsl(CalcTinyGhostPosition)
+	m_asmcall(ASM_CalcTinyGhostPos)
 	
 LoopBack:
-	m_pause(1)
+	m_pause(2)
 	m_jmp(Loop)
 	
 End:
@@ -1128,7 +1082,7 @@ Defend:
 	
 PSI:
 	m_get_flag(PAULA_PSI_FLAG)
-	m_jeq(RunAway)
+	m_jeq(Pray)
 	
 	MOV_ChangeSpriteGroup(PAULA_PSI_SPRITE)
 	
@@ -1157,6 +1111,39 @@ PSI:
 		
 	PSIDiamondized:
 		m_unset_flag(PAULA_PSI_FLAG)
+		m_jmp(Diamondized)
+		
+Pray:
+	m_get_flag(PAULA_PRAY_FLAG)
+	m_jeq(RunAway)
+	
+	MOV_ChangeSpriteGroup(PAULA_PRAY_SPRITE)
+	
+	PrayLockingWait:
+		m_get_flag(VICTORY_FLAG)
+		m_jne(Victory)
+	
+		PaulaPrayAnimation
+		
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		m_multijmp(3)
+			short PrayContinue
+			short PrayUnconscious
+			short PrayDiamondized
+			
+	PrayContinue:
+		m_get_flag(PAULA_PRAY_FLAG)
+		m_jne(PrayLockingWait)
+		m_jmp(Loop_Back)
+		
+	PrayUnconscious:
+		m_unset_flag(PAULA_PRAY_FLAG)
+		m_jmp(Unconscious)
+
+	PrayDiamondized:
+		m_unset_flag(PAULA_PRAY_FLAG)
 		m_jmp(Diamondized)
 	
 RunAway:
@@ -1426,6 +1413,14 @@ define PaulaPSIAnimation = {
 	m_pause(10)
 }
 
+define PaulaPrayAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+}
+
 define PaulaRunawayAnimation = {
 	m_set_facing_anim(SW, 0)
 	m_refresh_graphics_frame0
@@ -1598,10 +1593,10 @@ Loop:
 	m_jmp (End)
 	
 Continue:
-	m_jsl(CalcTinyGhostPosition)
+	m_asmcall(ASM_CalcTinyGhostPos)
 	
 LoopBack:
-	m_pause(1)
+	m_pause(2)
 	m_jmp(Loop)
 	
 End:
@@ -1683,7 +1678,7 @@ Goods:
 	
 Defend:
 	m_get_flag(JEFF_DEF_FLAG)
-	m_jeq(SPY)
+	m_jeq(Spy)
 	
 	MOV_ChangeSpriteGroup(JEFF_DEF_SPRITE)
 	
@@ -1714,7 +1709,7 @@ Defend:
 			m_unset_flag(JEFF_DEF_FLAG)
 			m_jmp(Diamondized)
 	
-SPY:
+Spy:
 	m_get_flag(JEFF_SPY_FLAG)
 	m_jeq(RunAway)
 	
@@ -2107,71 +2102,696 @@ define JeffVictoryAnimation = {
 	m_pause(1)
 }
 
-//+=+=+=+=+= POO =+=+=+=+=+=+
+//+=+=+=+=+= POO ANIMATIONS =+=+=+=+=+=+
 
-CreatePooBattleSpr: {
+Poo_Create_Mushroom:
+	BowsprCC_CreateSprite(226, PooCreateMushroom)
+	eob
+	
+Poo_Create_TinyGhost:
+	BowsprCC_CreateSprite(264, PooCreateTinyGhost)
+	eob
+
+
+PooCreateMushroom: {
 	Vittorio_bowspr_preamble
 	m_ontick_nop
 	m_priority(0)
 	
-	m_get_mem16(0x988B)
-	m_and_result(0xFF)
-	m_add_result(-4)
-	m_jeq(Poo_Spr)
+	m_set_facing_anim(N, 0)
+	m_refresh_graphics
+	m_warp_to_sprite(POO_IDLE_SPRITE)
+	m_add_ypos(-0x0E)
 	
-	m_get_mem16(0x988C)
-	m_and_result(0xFF)
-	m_add_result(-4)
-	m_jeq(Poo_Spr)
+	m_set_result(PTY_BTLR_ADDR)
+	m_add_result(0x4E)
+	m_add_result(0x4E)
+	m_add_result(0x4E)	// Offset to get Poo's data in battle
+	m_add_result(0x1E)
+	m_rtovar7		// Poo's Sprite Changing status
+
+Loop:
+	m_get_var7
+	m_get_mem8_at_result
+	m_multijmp(3)
+		short End
+		short LoopBack
+		short End
+	m_jmp (End)
 	
-	m_get_mem16(0x988D)
-	m_and_result(0xFF)
-	m_add_result(-4)
-	m_jeq(Poo_Spr)
+LoopBack:
+	m_pause(1)
+	m_jmp(Loop)
 	
-	m_get_mem16(0x988E)
-	m_and_result(0xFF)
-	m_add_result(-4)
-	m_jne(End)
+End:
+	m_destroy_self
+}
+
+PooCreateTinyGhost: {
+	Vittorio_bowspr_preamble
+	m_ontick_nop
+	m_priority(0)
 	
-Poo_Spr:
-	m_set_xpos(AS_POO_X_POS)
-	m_set_ypos(AS_BACK_ROW_Y_POS)
-	m_set_facing_anim(8, 0)
+	m_set_facing_anim(N, 0)
+	m_refresh_graphics
+	m_warp_to_sprite(POO_IDLE_SPRITE)
+	m_add_ypos(-0x0E)
+	
+	m_set_result(PTY_BTLR_ADDR)
+	m_add_result(0x4E)
+	m_add_result(0x4E)
+	m_add_result(0x4E)	// Poo's offset to the address
+	m_add_result(0x1E)
+	m_rtovar7		// Poo's Sprite Changing status
+	m_set_var6(0)	// Frame count for our Sine function in Y direction
+	m_set_var3(0x40)// Frame count for our Sine function in x direction
+	m_set_var5(0)	// Ghost Direction Flag to check to add or subtract y-pos from the sine function
+	m_set_var2(0)	// Ghost Direction Flag to check to add or subtract x-pos from the sine function
+	m_set_var4(0)	// Return Value from the Sine funciton
+	m_asmcall(ASM_GetObjYPosToResult)
+	m_rtovar0		// var0 is the initial position of the ghost sprite's y-Pos
+	m_asmcall(ASM_GetObjXPosToResult)
+	m_rtovar1		// var1 is the initial position of the ghost sprite's x-pos
 	
 Loop:
-	m_pause(1)
+	m_get_var7
+	m_get_mem8_at_result
+	m_multijmp(3)
+		short End
+		short End
+		short Continue
+	m_jmp (End)
 	
-	m_get_flag(POO_ATK_FLAG)
+Continue:
+	m_asmcall(ASM_CalcTinyGhostPos)
+	
+LoopBack:
+	m_pause(2)
+	m_jmp(Loop)
+	
+End:
+	m_destroy_self
+}
+
+// TODO: Poo's mirror enemy isn't showing or displaying on the battle field, not sure
+//       what could be the problem.....
+PooCreateMirrorEnemy: {
+	Vittorio_bowspr_preamble
+	m_ontick_nop
+	m_priority(0)
+	
+	m_set_facing_anim(N, 0)
+	m_refresh_graphics
+	m_warp_to_sprite(POO_MIRROR_SPRITE)
+	
+Loop:
+	m_get_flag(VICTORY_FLAG)
+	m_jne(End)
+	
+	m_set_result(POO_MIRROR_TURN_COUNT)
+	m_get_mem8_at_result
+	m_jeq(End)
+	
+LoopBack:
+	// Animate the mirror sprite
+	m_set_facing_anim(N, 0)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+	
+	m_jmp(Loop)
+	
+End:
+	m_sound(SND_PING)
+	m_set_mem8(POO_MIRROR_TURN_COUNT, 0)
+	m_destroy_self
+}
+
+CreatePooBattleSprLogic: {
+	Vittorio_bowspr_preamble
+	m_ontick_nop
+	m_priority(3)
+	
+	m_get_mem16(0x988B)
+	m_and_result(0xFF)
 	m_add_result(-1)
-	m_jne(Loop_Back)
+	m_jne(End)
 	
-	// Jeff is attacking
-	m_unset_flag(POO_ATK_FLAG)
-	m_textcall2(SFX_BASH)
+	m_set_xpos(AS_POO_X_POS)
+	m_set_ypos(AS_BACK_ROW_Y_POS)
+	m_set_facing_anim(NE, 0)
+						
+	m_set_result(PTY_BTLR_ADDR)
+	m_add_result(0x4E)
+	m_add_result(0x4E)
+	m_add_result(0x4E)
+	m_rtovar7			// Var7 contains Poo's Battler address
+	m_set_result(0)	
+	m_rtovar6			// Var6 is Poo's possession/mushroomized status
+						// 0x01 = Mushroomized, 0x02 = Possessed
+	
+Loop:
+	m_get_flag(VICTORY_FLAG)
+	m_jne(Victory)
+	
+	m_pause(1)
+		
+Attack:
+	m_get_flag(POO_ATK_FLAG)
+	m_jeq(Goods)
+	
 	m_unlock_text
 	
-	// Attack Sprite Animation
-	m_refresh_graphics_frame1
-	m_pause(10)
-	m_refresh_graphics_frame0
-	m_pause(10)
-	m_refresh_graphics_frame1
-	m_pause(10)
-	m_refresh_graphics_frame0
-	m_pause(10)
-	m_refresh_graphics_frame1
-	m_pause(10)
-	m_refresh_graphics_frame0
-	m_pause(10)
+	MOV_ChangeSpriteGroup(POO_ATK_SPRITE)
+	PooAttackAnimation
 	
+	m_unset_flag(POO_ATK_FLAG)
+	m_jmp(Loop_Back)
+	
+Goods:
+	m_get_flag(POO_GOODS_FLAG)
+	m_jeq(Defend)
+	
+	MOV_ChangeSpriteGroup(POO_GOODS_SPRITE)
+	
+	GoodsLockingWait:
+		m_get_flag(VICTORY_FLAG)
+		m_jne(Victory)
+	
+		PooGoodsAnimation
+		
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		m_multijmp(3)
+			short GoodsContinue
+			short GoodsUnconscious
+			short GoodsDiamondized
+			
+	GoodsContinue:
+		m_get_flag(POO_GOODS_FLAG)
+		m_jne(GoodsLockingWait)
+		m_jmp(Loop_Back)
+		
+	GoodsUnconscious:
+		m_unset_flag(POO_GOODS_FLAG)
+		m_jmp(Unconscious)
+
+	GoodsDiamondized:
+		m_unset_flag(POO_GOODS_FLAG)
+		m_jmp(Diamondized)
+	
+Defend:
+	m_get_flag(POO_DEF_FLAG)
+	m_jeq(PSI)
+	
+	MOV_ChangeSpriteGroup(POO_DEF_SPRITE)
+	
+	DefendLockingWait:
+		m_get_flag(VICTORY_FLAG)
+		m_jne(Victory)
+	
+		PooDefendAnimation
+		
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		m_multijmp(3)
+			short DefendContinue
+			short DefendUnconscious
+			short DefendDiamondized
+			
+		DefendContinue:
+			m_get_flag(POO_DEF_FLAG)
+			m_jne(DefendLockingWait)
+			m_jmp(Loop_Back)
+		
+		DefendUnconscious:
+			m_unset_flag(POO_DEF_FLAG)
+			m_jmp(Unconscious)
+		
+		DefendDiamondized:
+			m_unset_flag(POO_DEF_FLAG)
+			m_jmp(Diamondized)
+	
+PSI:
+	m_get_flag(POO_PSI_FLAG)
+	m_jeq(Mirror)
+	
+	MOV_ChangeSpriteGroup(POO_PSI_SPRITE)
+	
+	PSILockingWait:
+		m_get_flag(VICTORY_FLAG)
+		m_jne(Victory)
+	
+		PooPSIAnimation
+			
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		m_multijmp(3)
+			short PSIContinue
+			short PSIUnconscious
+			short PSIDiamondized
+		
+	PSIContinue:
+		m_get_flag(POO_PSI_FLAG)
+		m_jne(PSILockingWait)
+		m_jmp(Loop_Back)
+	
+	PSIUnconscious:
+		m_unset_flag(POO_PSI_FLAG)
+		m_jmp(Unconscious)
+		
+	PSIDiamondized:
+		m_unset_flag(POO_PSI_FLAG)
+		m_jmp(Diamondized)
+	
+Mirror:
+	m_set_result(POO_MIRROR_TURN_COUNT)
+	m_get_mem8_at_result
+	m_jeq(RunAway)
+	
+	// TODO: Will have to see the text that has Poo's mirror inside so we can set the flag
+	//       in there instead of setting it in the battle_menu file.
+	
+	m_set_result(MIRROR_ENEMY_ID)
+	m_get_mem8_at_result
+	m_asmcall(ASM_ReturnEnemyOverworldSpriteID)
+	m_asmcall(ASM_CreatePooMirrorSprite)
+	
+	MOV_ChangeSpriteGroup(POO_MIRROR_SPRITE)
+	m_refresh_graphics
+	
+	MirrorLockingWait:
+		m_get_flag(VICTORY_FLAG)
+		m_jne(Victory)
+	
+		PooMirrorAnimation
+			
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		m_multijmp(3)
+			short MirrorContinue
+			short MirrorUnconscious
+			short MirrorDiamondized
+		
+	MirrorContinue:
+		m_set_result(POO_MIRROR_TURN_COUNT)
+		m_get_mem8_at_result
+		m_jne(MirrorLockingWait)
+		m_jmp(Loop_Back)
+	
+	MirrorUnconscious:
+		m_unset_flag(POO_PSI_FLAG)
+		m_jmp(Unconscious)
+		
+	MirrorDiamondized:
+		m_unset_flag(POO_PSI_FLAG)
+		m_jmp(Diamondized)
+	
+RunAway:
+	
+	m_get_flag(PARTY_RUNAWAY_FLAG)
+	m_jeq(StatusAffiction)
+	
+	MOV_ChangeSpriteGroup(POO_RUNAWAY_SPRITE)
+	
+	RunawayLockingWait:
+		m_get_flag(VICTORY_FLAG)
+		m_jne(Victory)
+	
+		PooRunawayAnimation
+		
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		m_multijmp(3)
+			short RunAwayContinue
+			short RunAwayUnconscious
+			short RunAwayDiamondized
+		
+	RunAwayContinue:
+		m_get_flag(PARTY_RUNAWAY_FLAG)
+		m_jne(RunawayLockingWait)
+		m_jmp(Loop_Back)
+		
+	RunAwayUnconscious:
+		m_jmp(Unconscious)
+		
+	RunAwayDiamondized:
+		m_jmp(Diamondized)
+	
+StatusAffiction:
+	CheckHomesickness:
+		m_get_var7
+		m_add_result(0x22)
+		m_get_mem8_at_result
+		m_jne(Homesickness)
+	
+	CheckCannotConcentrate:
+		m_get_var7
+		m_add_result(0x21)
+		m_get_mem8_at_result
+		m_jne(CannotConcentrate)
+		
+	CheckFeelingStrange:
+		m_get_var7
+		m_add_result(0x20)
+		m_get_mem8_at_result
+		m_jne(FeelingStrange)
+		
+	CheckInOverworldAffliction:
+		m_get_var7
+		m_add_result(0x1E)
+		m_get_mem8_at_result
+		m_multijmp(3)
+			short CheckInBattleAffliction
+			short Mashroomized
+			short Possessed
+		
+	CheckInBattleAffliction:
+		m_get_var7
+		m_add_result(0x1F)
+		m_get_mem8_at_result
+		m_multijmp(5)
+			short CheckPermanentAffliction
+			short Sleeping
+			short Crying
+			short Immobilized
+			short Solidified
+		
+	CheckPermanentAffliction:
+		m_get_var7
+		m_add_result(0x1D)
+		m_get_mem8_at_result
+		m_jeq(Normal)
+		m_multijmp(8)
+			short Normal
+			short Unconscious
+			short Diamondized
+			short Paralized
+			short Nauseous
+			short Poisoned
+			short Sunstroke
+			short Cold
+	
+Normal:
+	MOV_ChangeSpriteGroup(POO_IDLE_SPRITE)
+	PooIdleAnimation
+	m_jmp(Loop_Back)
+	
+Unconscious:
+	MOV_ChangeSpriteGroup(POO_UNCON_SPRITE)
+	PooUnconsciousAnimation
+	m_jmp(Loop_Back)
+	
+Diamondized:
+	MOV_ChangeSpriteGroup(POO_DIA_SPRITE)
+	PooDiamondizedAnimation
+	m_jmp(Loop_Back)
+
+Paralized:
+	MOV_ChangeSpriteGroup(POO_PARA_SPRITE)
+	PooParalizedAnimation
+	m_jmp(Loop_Back)
+
+Nauseous:
+	MOV_ChangeSpriteGroup(POO_NAUS_SPRITE)
+	PooNauseousAnimation
+	m_jmp(Loop_Back)
+	
+Poisoned:
+	MOV_ChangeSpriteGroup(POO_POIS_SPRITE)
+	PooPoisonedAnimation
+	m_jmp(Loop_Back)
+
+Sunstroke:
+	MOV_ChangeSpriteGroup(POO_SUNS_SPRITE)
+	PooSunstrokeAnimation
+	m_jmp(Loop_Back)
+
+Cold:
+	MOV_ChangeSpriteGroup(POO_COLD_SPRITE)
+	PooColdAnimation
+	m_jmp(Loop_Back)
+
+Mashroomized:
+	m_get_var6
+	m_and_result(0x01)
+	m_jne(Mashroomized_Continue)
+	
+	m_textcall2(Poo_Create_Mushroom)
+	m_get_var6
+	m_or_result(0x01)
+	m_rtovar6
+	
+	Mashroomized_Continue:
+		MOV_ChangeSpriteGroup(POO_MUSH_SPRITE)
+		PooMashroomizedAnimation
+		
+	m_jmp(Loop_Back)
+
+Possessed:
+	m_get_var6
+	m_and_result(0x02)
+	m_jne(Possessed_Continue)
+	
+	m_textcall2(Poo_Create_TinyGhost)
+	m_get_var6
+	m_or_result(0x02)
+	m_rtovar6
+
+	Possessed_Continue:
+		MOV_ChangeSpriteGroup(POO_POSS_SPRITE)
+		PooPossessedAnimation
+	
+	m_jmp(Loop_Back)
+
+Sleeping:
+	MOV_ChangeSpriteGroup(POO_SLEEP_SPRITE)
+	PooSleepingAnimation
+	m_jmp(Loop_Back)
+
+Crying:
+	MOV_ChangeSpriteGroup(POO_CRY_SPRITE)
+	PooCryingAnimation
+	m_jmp(Loop_Back)
+
+Immobilized:
+	MOV_ChangeSpriteGroup(POO_IMMOB_SPRITE)
+	PooImmobilizedAnimation
+	m_jmp(Loop_Back)
+
+Solidified:
+	MOV_ChangeSpriteGroup(POO_SOLID_SPRITE)
+	PooSolidifedAnimation
+	m_jmp(Loop_Back)
+
+FeelingStrange:
+	MOV_ChangeSpriteGroup(POO_FEELS_SPRITE)
+	PooFeelingStrangeAnimation
+	m_jmp(Loop_Back)
+
+CannotConcentrate:
+	MOV_ChangeSpriteGroup(POO_CNTCON_SPRITE)
+	PooCannotConcentrateAnimation
+	m_jmp(Loop_Back)
+
+Homesickness:
+	MOV_ChangeSpriteGroup(POO_HMSIK_SPRITE)
+	PooHomesicknessAnimation
 	m_jmp(Loop_Back)
 	
 Loop_Back:
 	m_jmp(Loop)
 	
+Victory:
+	// Turn around to face camera
+	m_set_result(POO_MIRROR_TURN_COUNT)
+	m_get_mem8_at_result
+	m_jeq(VictoryContinue)
+	
+	// Waits until the mirror count turns 0, then change Poo to his idle sprite
+	// It turns to 0 by the destruction of the mirrored enemy sprite
+	VictoryMirrorLockingWait:
+		m_set_result(POO_MIRROR_TURN_COUNT)
+		m_get_mem8_at_result
+		m_pause(1)
+		m_jne(VictoryMirrorLockingWait)
+		
+	MOV_ChangeSpriteGroup(POO_IDLE_SPRITE) // Change to regular Poo idle sprite if mirrored
+	m_refresh_graphics
+	
+	VictoryContinue:
+		m_set_facing_anim(NE, 0)
+		m_pause(5)
+		m_set_facing_anim(E, 0)
+		m_pause(5)
+		m_set_facing_anim(SE, 0)
+		m_pause(5)
+		m_set_facing_anim(S, 0)
+		m_pause(5)
+	
+	MOV_ChangeSpriteGroup(POO_VICTORY_SPRITE)
+	
+	VictoryAnimLoop:
+		PooVictoryAnimation
+		m_jmp(VictoryAnimLoop)
+
 End:
 	m_destroy_self
+}
+
+define PooIdleAnimation = {	
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooAffIdleAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooAttackAnimation = {
+	m_set_facing_anim(NE, 0)
+	
+	m_refresh_graphics_frame1
+	m_pause(10)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+	m_refresh_graphics_frame0
+	m_pause(10)
+}
+
+define PooGoodsAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+}
+
+define PooDefendAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+}
+
+define PooPSIAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+}
+
+define PooMirrorAnimation = {
+	m_set_facing_anim(N, 0)
+	m_pause(10)
+}
+
+define PooRunawayAnimation = {
+	m_set_facing_anim(SW, 0)
+	m_refresh_graphics_frame0
+	m_pause(10)
+	m_refresh_graphics_frame1
+	m_pause(10)
+}
+
+define PooUnconsciousAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooDiamondizedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooParalizedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooNauseousAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooPoisonedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooSunstrokeAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooColdAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooMashroomizedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooPossessedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooSleepingAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooCryingAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooImmobilizedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooSolidifedAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooFeelingStrangeAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooCannotConcentrateAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooHomesicknessAnimation = {
+	m_set_facing_anim(NE, 0)
+	m_pause(1)
+}
+
+define PooVictoryAnimation = {
+	m_set_facing_anim(S, 0)
+	m_pause(1)
 }
 
 
@@ -2181,6 +2801,16 @@ End:
 define Current_Object_Slot 	= 0x1A42
 define OBJ_Script_Var0 		= 0x0E5E
 define OBJ_Script_Var1		= 0x0E9A
+define OBJ_Script_Var2		= 0x0ED6
+define OBJ_Script_Var3		= 0x0F12
+define OBJ_Script_Var4		= 0x0F4E
+define OBJ_Script_Var5		= 0x0F8A
+define OBJ_Script_Var6		= 0x0FC6
+define OBJ_Script_Var7		= 0x1002
+
+
+
+
 ASM_GetObjYPosToResult: {
 	REP (0x31)
 	PHD
@@ -2298,27 +2928,196 @@ ASM_ResultPlusVar1: {
 	RTL
 }
 
-/*
-C4/68DC: C2 31        REP #$31
-C4/68DE: 0B           PHD
-C4/68DF: 48           PHA
-C4/68E0: 7B           TDC
-C4/68E1: 69 EE FF     ADC #$FFEE
-C4/68E4: 5B           TCD
-C4/68E5: 68           PLA
-C4/68E6: 85 10        STA $10
-C4/68E8: A2 00 00     LDX #$0000
-C4/68EB: 86 0E        STX $0E
-C4/68ED: AD 42 1A     LDA Current_Object_Slot
-C4/68F0: 0A           ASL
-C4/68F1: AA           TAX
-C4/68F2: A5 10        LDA $10
-C4/68F4: DD CA 0B     CMP OBJ_Pos_Y,X
-C4/68F7: B0 05        BCS $68FE
-C4/68F9: A2 01 00     LDX #$0001
-C4/68FC: 86 0E        STX $0E
-C4/68FE: A6 0E        LDX $0E
-C4/6900: 8A           TXA
-C4/6901: 2B           PLD
-C4/6902: 6B           RTL
-*/
+// A: ID of the enemy in battle
+// Returns: A: The enemy's Overworld Sprite ID
+ASM_ReturnEnemyOverworldSpriteID: {
+	REP (0x31)
+	PHD
+	PHA
+	TDC
+	ADC_i (0xFFEE)
+	TCD
+	PLA 
+	
+	LDY_i (0x5E)
+	JSL (0xC09032)	// Multiply A and Y register, return result to A register
+	CLC
+	ADC_i (0x1E)	// Add the offset for the enemy's overworld sprite
+	TAY				// Transfer result to Y register
+
+	LDA_i (short[0] ENEMY_CONFIG_TABLE)
+	STA_d (0x02)
+	LDA_i (short[1] ENEMY_CONFIG_TABLE)
+	STA_d (0x04)
+	
+	LDA_dly (0x02)	// Load in the enemy's overworld sprite ID
+	
+	PLD
+	RTL
+}
+
+ASM_CreatePooMirrorSprite: {
+	REP (0x31)
+	PHD
+	PHA
+	TDC
+	ADC_i (0xFFEE)
+	TCD
+	PLA 
+	
+	STA_d (0x02)
+	LDA_i (short[0] PooCreateMirrorEnemy)
+	STA_d (0x0E)
+	LDA_i (short[1] PooCreateMirrorEnemy)
+	STA_d (0x10)
+	
+	LDA_d (0x02)
+	JSL (ASM_BowsprCreateEntity)
+	
+	PLD
+	RTL
+}
+
+ASM_CalcTinyGhostPos: {
+	REP (0x31)
+	PHD
+	TDC
+	ADC_i (0xFFEE)
+	TCD 
+
+	LDA_a (Current_Object_Slot)
+	ASL
+	TAX
+	LDA_x (OBJ_Script_Var6)
+	STA_d (0x0C)
+	LDA_x (OBJ_Script_Var5)
+	STA_d (0x0A)
+	STZ_d (0x08)
+	
+	LDA_d (0x0C)					// m_get_var6
+	AND_i (0x00FF)
+	JSL (Sine)						// m_asmcall(Sine)
+	
+	LSR
+	LSR
+	LSR
+	LSR								// m_asmcall(ASM_Divide16FromResult)
+	
+	STA_d (0x08)					// m_rtovar4
+	
+	LDA_d (0x0A)					// m_get_var5
+	BNE_a (GhostFloatYPos)			// m_jne(GhostFloatYPos)
+	
+	GoingUp:  // This is when the ghost sprite is going up, usually goes down first
+		LDA_d (0x08)				// m_get_var4
+		EOR_i (0xFFFF)				// m_xor_result(0xFFFF)
+		INC							// m_add_result(0x01)
+		STA_d (0x08)				// m_rtovar4
+	
+GhostFloatYPos:
+	LDA_a (Current_Object_Slot)		
+	ASL
+	TAX
+	LDA_x (OBJ_Script_Var0)
+	CLC			
+	ADC_d (0x08)					// m_get_var4 + m_asmcall(ASM_ResultPlusVar0)
+	JSL (ASM_SetObjYPosFromResult)	// m_asmcall(ASM_SetObjYPosFromResult)
+	
+	INC_d (0x0C)					// m_get_var6 + m_add_result(1) + m_rtovar6
+	LDA_d (0x0C)
+	AND_i (0x0080)					// m_and_result(0x80)
+	BEQ_a (CheckXDirection)			// m_jeq(CheckXDirection)
+	
+	ChangeFloatingDirectionYPos:
+		LDA_d (0x0A)				// m_get_var5
+		EOR_i (0x0001)				// m_xor_result(0x01)
+		AND_i (0x0001)				// m_and_result(0x01)
+		STA_d (0x0A)				// m_rtovar5
+		STZ_d (0x0C)				// m_set_var6(0)
+	
+CheckXDirection:
+	LDA_a (Current_Object_Slot)
+	ASL
+	TAX
+	LDA_x (OBJ_Script_Var3)
+	STA_d (0x06)
+	LDA_x (OBJ_Script_Var2)
+	STA_d (0x04)
+	STZ_d (0x08)
+	
+	LDA_d (0x06)					// m_get_var3
+	AND_i (0x00FF)
+	JSL (Sine)						// m_asmcall(Sine)
+	
+	LSR
+	LSR	
+	LSR								// m_asmcall(ASM_Divide8FromResult)
+	
+	STA_d (0x08)					// m_rtovar4
+	
+	LDA_d (0x04)					// m_get_var2
+	BNE_a (GhostFloatXPos)			// m_jne(GhostFloatXPos)
+
+	GoingLeft:
+		LDA_d (0x08)				// m_get_var4
+		EOR_i (0xFFFF)				// m_xor_result(0xFFFF)
+		INC							// m_add_result(0x01)
+		STA_d (0x08)				// m_rtovar4
+	
+GhostFloatXPos:
+	LDA_a (Current_Object_Slot)
+	ASL
+	TAX
+	LDA_x (OBJ_Script_Var1)
+	CLC
+	ADC_d (0x08)					// m_get_var4 + m_asmcall(ASM_ResultPlusVar1)
+	JSL (ASM_SetObjXPosFromResult)	// m_asmcall(ASM_SetObjXPosFromResult)
+
+	INC_d (0x06)					// m_get_var3 + m_add_result(1) + m_rtovar3
+	LDA_d (0x06)
+	AND_i (0x0080)					// m_and_result(0x80)
+	BEQ_a (Return)					// m_jeq(Return)
+	
+	ChangeFloatingDirectionXPos:
+		LDA_d (0x04)				// m_get_var2
+		EOR_i (0x0001)				// m_xor_result(0x01)
+		AND_i (0x0001)				// m_and_result(0x01)
+		STA_d (0x04)				// m_rtovar2
+		STZ_d (0x06)				// m_set_var3(0)
+	
+// Set back all of the DPR values back into the Object's Var values
+Return:
+	LDA_a (Current_Object_Slot)
+	ASL
+	STA_d (0x02)
+	
+	CLC
+	ADC_i (OBJ_Script_Var2)
+	TAX
+	LDA_d (0x04)
+	STA_x (0x0000)
+	
+	LDA_d (0x02)
+	CLC
+	ADC_i (OBJ_Script_Var3)
+	TAX
+	LDA_d (0x06)
+	STA_x (0x0000)
+	
+	LDA_d (0x02)
+	CLC
+	ADC_i (OBJ_Script_Var5)
+	TAX
+	LDA_d (0x0A)
+	STA_x (0x0000)
+
+	LDA_d (0x02)
+	CLC
+	ADC_i (OBJ_Script_Var6)
+	TAX
+	LDA_d (0x0C)
+	STA_x (0x0000)
+
+	PLD
+	RTL
+}

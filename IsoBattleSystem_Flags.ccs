@@ -7,24 +7,19 @@ define NESS_ATK_FLAG 		= 0x3FD
 define NESS_PSI_FLAG		= 0x3FC
 define NESS_GOODS_FLAG		= 0x3FB
 define NESS_DEF_FLAG		= 0x3FA
-define NESS_DMG_FLAG		= 0x3F9
 
 define PAULA_ATK_FLAG		= 0x3F6
 define PAULA_PSI_FLAG		= 0x3F5
 define PAULA_GOODS_FLAG		= 0x3F4
 define PAULA_DEF_FLAG		= 0x3F3
 define PAULA_PRAY_FLAG		= 0x3F2
-define PAULA_DMG_FLAG		= 0x3F1
 
 define JEFF_ATK_FLAG		= 0x3EE
 define JEFF_SPY_FLAG		= 0x3ED
 define JEFF_GOODS_FLAG		= 0x3EC
 define JEFF_DEF_FLAG		= 0x3EB
-define JEFF_DMG_FLAG		= 0x3EA
 
 define POO_ATK_FLAG			= 0x3E7
 define POO_PSI_FLAG			= 0x3E6
 define POO_GOODS_FLAG		= 0x3E5
 define POO_DEF_FLAG			= 0x3E4
-define POO_MIRROR_FLAG		= 0x3E3
-define POO_DMG_FLAG			= 0x3E2

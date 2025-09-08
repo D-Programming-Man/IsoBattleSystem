@@ -15,7 +15,7 @@ ROM[0xC2F534] = {
 	LDA_8 (0x60)
 }
 
-// Adusts the space inbetween each enemy and teh x-pos slightly
+// Adjusts the space inbetween each enemy and the x-pos slightly
 ROM[0xC2F516] = {
 	JSL (Adjust_Enemy_Spacing)
 	NOP
@@ -59,6 +59,7 @@ ROM[0xC25EF3] = {
 	NOP
 }
 */
+
 
 define CURRENT_BATTLE_GROUP_ADDR = 0x4A8C
 define CreateTBoxLong = 0xC1DD47
