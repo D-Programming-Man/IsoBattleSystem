@@ -9,9 +9,8 @@ import battle_menu
 import menu_macros
 import change_sprite_group
 
-/*
-TODO: 	. Incorprate the rest of the battle animations to the other party members
-		. Something... forgot what it was though
+/*	REMINDERS:
+	. The flags are stored in the IsoBattleSystem_Flags.ccs file
 */
 //+=+=+=+=+=+= Defines =+=+=+=+=+=+=+
 define wait_for_action 		= "[1F 61]"
@@ -25,10 +24,16 @@ define CURRENT_PARTY_ADDR 	= 0x988B	// length 7 Bytes
 define PTY_BTLR_ADDR		= 0x9FAC
 define PTY_BTLR_STRUCT_SIZE = 0x4E
 define POO_MIRROR_TURN_COUNT= 0xAA62
-define MIRROR_ENEMY_ID		= 0xAA12
+define MIRROR_ENEMY_ID_ADDR	= 0xAA12
+define PARTY_ORDER_ADDR		= 0x988B
 define ENEMY_CONFIG_TABLE 	= 0xD59589
-
-define TIME_ACT_TO_IDLE		= 1			// In Frames
+define SUBSPRITE_OFFSET		= -0x0E
+define PERM_STAT_OFFSET		= 0x1D
+define SPRITE_AFF_OFFSET	= 0x1E
+define BATTLE_AFF_OFFSET	= 0x1F
+define FEEL_STRANGE_OFFSET	= 0x20
+define CONSENTRATE_OFFSET	= 0x21
+define HOMESICKNESS_OFFSET	= 0x22
 
 // Action Script Sprite Direction
 define N  = 1
@@ -153,7 +158,7 @@ define POO_VICTORY_SPRITE	= 4
 //+=+=+=+=+=+= Commands =+=+=+=+=+=+=+
 // Tie sprite position relative to the correct layer (windows layer) based on BGMODE (0x000F).
 // Thanks Vittorio
-command Vittorio_bowspr_preamble {
+command bowspr_preamble {
 
 m_get_mem16(0x000F) m_and_result(1) m_jeq(M_mode0)
 
@@ -189,9 +194,9 @@ NPC:
 	unset(POO_GOODS_FLAG)
 	
 	party_add(2)
-	party_add(3)
-	party_add(4)
-	//"[19 05 01 02 03]"
+	//party_add(3)
+	//party_add(4)
+	
 	music(0x82)
 	battle(171)
 	eob
@@ -256,15 +261,12 @@ Jeff_Shoot:
 	wait_for_action
 	eob
 
-// NOTE: Order matters on which spirite gets loaded because the first one sets up
-//       the palettes for the rest of the other characters to use
 Create_Party_Spr:
-	BowsprCC_Begin(0, 2)
+	BowsprCC_Begin(0, 0x02)
 	BowsprCC_CreateSprite(1, CreateNessBattleSprLogic)
 	BowsprCC_CreateSprite(2, CreatePaulaBattleSprLogic)
 	BowsprCC_CreateSprite(3, CreateJeffBattleSprLogic)
 	BowsprCC_CreateSprite(4, CreatePooBattleSprLogic)
-	
 	eob
 
 //+=+=+=+=+=+= Action Scripts =+=+=+=+=+=+=+
@@ -277,12 +279,6 @@ NPCActionScript: {
 
 loop:
 	m_wait_until_touch
-	//m_textcall2(Hide)
-	//m_pause(60)
-	
-	//m_textcall2(Show)
-	//m_pause(60)
-	
 	m_textcall(NPC)
 	m_pause(60)
 	
@@ -313,14 +309,14 @@ Ness_Create_TinyGhost:
 	eob
 
 NessCreateMushroom: {
-	Vittorio_bowspr_preamble
+	bowspr_preamble
 	m_ontick_nop
 	m_priority(0)
 	
 	m_set_facing_anim(N, 0)
 	m_refresh_graphics
 	m_warp_to_sprite(NESS_IDLE_SPRITE)
-	m_add_ypos(-0x0E)
+	m_add_ypos(SUBSPRITE_OFFSET)
 	
 	m_set_result(PTY_BTLR_ADDR)
 	m_add_result(0x1E)
@@ -345,18 +341,18 @@ End:
 
 
 NessCreateTinyGhost: {
-	Vittorio_bowspr_preamble
+	bowspr_preamble
 	m_ontick_nop
 	m_priority(0)
 	
 	m_set_facing_anim(N, 0)
 	m_refresh_graphics
 	m_warp_to_sprite(NESS_IDLE_SPRITE)
-	m_add_ypos(-0x0E)
+	m_add_ypos(SUBSPRITE_OFFSET)
 	
 	m_set_result(PTY_BTLR_ADDR)
-	m_add_result(0x1E)
-	m_rtovar7		// Ness's Sprite Changing status
+	m_add_result(SPRITE_AFF_OFFSET)
+	m_rtovar7		// Ness's Overworld status address
 	m_set_var6(0)	// Frame count for our Sine function in Y direction
 	m_set_var3(0x40)// Frame count for our Sine function in x direction
 	m_set_var5(0)	// Ghost Direction Flag to check to add or subtract y-pos from the sine function
@@ -389,14 +385,13 @@ End:
 }
 
 CreateNessBattleSprLogic: {
-	Vittorio_bowspr_preamble
+	bowspr_preamble
 	m_ontick_nop
 	m_priority(3)
 	
-	m_get_mem16(0x988B)
-	m_and_result(0xFF)
-	m_add_result(-1)
-	m_jne(End)
+	m_set_result(1)		// Load in Ness' party ID
+	m_asmcall(ASM_CheckIfInParty)	// Check if he is in the party
+	m_jeq(End)			// If not, don't draw him
 	
 	m_set_xpos(AS_NESS_X_POS)
 	m_set_ypos(AS_FRONT_ROW_Y_POS)
@@ -439,7 +434,7 @@ Goods:
 		NessGoodsAnimation
 		
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short GoodsContinue
@@ -472,7 +467,7 @@ Defend:
 		NessDefendAnimation
 		
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short DefendContinue
@@ -538,7 +533,7 @@ RunAway:
 		NessRunawayAnimation
 		
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short RunAwayContinue
@@ -559,25 +554,25 @@ RunAway:
 StatusAffiction:
 	CheckHomesickness:
 		m_get_var7
-		m_add_result(0x22)
+		m_add_result(HOMESICKNESS_OFFSET)
 		m_get_mem8_at_result
 		m_jne(Homesickness)
 	
 	CheckCannotConcentrate:
 		m_get_var7
-		m_add_result(0x21)
+		m_add_result(CONSENTRATE_OFFSET)
 		m_get_mem8_at_result
 		m_jne(CannotConcentrate)
 		
 	CheckFeelingStrange:
 		m_get_var7
-		m_add_result(0x20)
+		m_add_result(FEEL_STRANGE_OFFSET)
 		m_get_mem8_at_result
 		m_jne(FeelingStrange)
 		
-	CheckInOverworldAffliction:
+	CheckSpriteAffliction:
 		m_get_var7
-		m_add_result(0x1E)
+		m_add_result(SPRITE_AFF_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short CheckInBattleAffliction
@@ -589,7 +584,7 @@ StatusAffiction:
 		m_rtovar6
 		
 		m_get_var7
-		m_add_result(0x1F)
+		m_add_result(BATTLE_AFF_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(5)
 			short CheckPermanentAffliction
@@ -600,7 +595,7 @@ StatusAffiction:
 		
 	CheckPermanentAffliction:
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_jeq(Normal)
 		m_multijmp(8)
@@ -900,18 +895,18 @@ Paula_Create_TinyGhost:
 
 
 PaulaCreateMushroom: {
-	Vittorio_bowspr_preamble
+	bowspr_preamble
 	m_ontick_nop
 	m_priority(0)
 	
 	m_set_facing_anim(N, 0)
 	m_refresh_graphics
 	m_warp_to_sprite(PAULA_IDLE_SPRITE)
-	m_add_ypos(-0x0E)
+	m_add_ypos(SUBSPRITE_OFFSET)
 	
 	m_set_result(PTY_BTLR_ADDR)
-	m_add_result(0x4E)	// Offset to get Paula's data in battle
-	m_add_result(0x1E)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)	// Offset to get Paula's data in battle
+	m_add_result(SPRITE_AFF_OFFSET)
 	m_rtovar7		// Paula's Sprite Changing status
 
 Loop:
@@ -932,18 +927,18 @@ End:
 }
 
 PaulaCreateTinyGhost: {
-	Vittorio_bowspr_preamble
+	bowspr_preamble
 	m_ontick_nop
 	m_priority(0)
 	
 	m_set_facing_anim(N, 0)
 	m_refresh_graphics
 	m_warp_to_sprite(PAULA_IDLE_SPRITE)
-	m_add_ypos(-0x0E)
+	m_add_ypos(SUBSPRITE_OFFSET)
 	
 	m_set_result(PTY_BTLR_ADDR)
-	m_add_result(0x4E)	// Paula's offset to the address
-	m_add_result(0x1E)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)	// Paula's offset to the address
+	m_add_result(SPRITE_AFF_OFFSET)
 	m_rtovar7		// Paula's Sprite Changing status
 	m_set_var6(0)	// Frame count for our Sine function in Y direction
 	m_set_var3(0x40)// Frame count for our Sine function in x direction
@@ -976,21 +971,20 @@ End:
 }
 
 CreatePaulaBattleSprLogic: {
-	Vittorio_bowspr_preamble
+	bowspr_preamble
 	m_ontick_nop
 	m_priority(3)
 	
-	m_get_mem16(0x988B)
-	m_and_result(0xFF)
-	m_add_result(-1)
-	m_jne(End)
+	m_set_result(2)		// Load in Paula's party ID
+	m_asmcall(ASM_CheckIfInParty)	// Check if she is in the party
+	m_jeq(End)			// If not, then don't draw her
 	
 	m_set_xpos(AS_PAULA_X_POS)
 	m_set_ypos(AS_BACK_ROW_Y_POS)
 	m_set_facing_anim(NE, 0)
 						
 	m_set_result(PTY_BTLR_ADDR)
-	m_add_result(0x4E)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)
 	m_rtovar7			// Var7 contains Paula's Battler address
 	m_set_result(0)	
 	m_rtovar6			// Var6 is Paula's possession/mushroomized status
@@ -1027,7 +1021,7 @@ Goods:
 		PaulaGoodsAnimation
 		
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short GoodsContinue
@@ -1060,7 +1054,7 @@ Defend:
 		PaulaDefendAnimation
 		
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short DefendContinue
@@ -1093,7 +1087,7 @@ PSI:
 		PaulaPSIAnimation
 			
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short PSIContinue
@@ -1126,7 +1120,7 @@ Pray:
 		PaulaPrayAnimation
 		
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short PrayContinue
@@ -1159,7 +1153,7 @@ RunAway:
 		PaulaRunawayAnimation
 		
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short RunAwayContinue
@@ -1180,25 +1174,25 @@ RunAway:
 StatusAffiction:
 	CheckHomesickness:
 		m_get_var7
-		m_add_result(0x22)
+		m_add_result(HOMESICKNESS_OFFSET)
 		m_get_mem8_at_result
 		m_jne(Homesickness)
 	
 	CheckCannotConcentrate:
 		m_get_var7
-		m_add_result(0x21)
+		m_add_result(CONSENTRATE_OFFSET)
 		m_get_mem8_at_result
 		m_jne(CannotConcentrate)
 		
 	CheckFeelingStrange:
 		m_get_var7
-		m_add_result(0x20)
+		m_add_result(FEEL_STRANGE_OFFSET)
 		m_get_mem8_at_result
 		m_jne(FeelingStrange)
 		
-	CheckInOverworldAffliction:
+	CheckSpriteAffliction:
 		m_get_var7
-		m_add_result(0x1E)
+		m_add_result(SPRITE_AFF_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short CheckInBattleAffliction
@@ -1207,7 +1201,7 @@ StatusAffiction:
 		
 	CheckInBattleAffliction:
 		m_get_var7
-		m_add_result(0x1F)
+		m_add_result(BATTLE_AFF_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(5)
 			short CheckPermanentAffliction
@@ -1218,7 +1212,7 @@ StatusAffiction:
 		
 	CheckPermanentAffliction:
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_jeq(Normal)
 		m_multijmp(8)
@@ -1526,19 +1520,19 @@ Jeff_Create_TinyGhost:
 
 
 JeffCreateMushroom: {
-	Vittorio_bowspr_preamble
+	bowspr_preamble
 	m_ontick_nop
 	m_priority(0)
 	
 	m_set_facing_anim(N, 0)
 	m_refresh_graphics
 	m_warp_to_sprite(JEFF_IDLE_SPRITE)
-	m_add_ypos(-0x0E)
+	m_add_ypos(SUBSPRITE_OFFSET)
 	
 	m_set_result(PTY_BTLR_ADDR)
-	m_add_result(0x4E)
-	m_add_result(0x4E)	// Offset to get Jeff's data in battle
-	m_add_result(0x1E)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)	// Offset to get Jeff's data in battle
+	m_add_result(SPRITE_AFF_OFFSET)
 	m_rtovar7		// Jeff's Sprite Changing status
 
 Loop:
@@ -1559,19 +1553,19 @@ End:
 }
 
 JeffCreateTinyGhost: {
-	Vittorio_bowspr_preamble
+	bowspr_preamble
 	m_ontick_nop
 	m_priority(0)
 	
 	m_set_facing_anim(N, 0)
 	m_refresh_graphics
 	m_warp_to_sprite(JEFF_IDLE_SPRITE)
-	m_add_ypos(-0x0E)
+	m_add_ypos(SUBSPRITE_OFFSET)
 	
 	m_set_result(PTY_BTLR_ADDR)
-	m_add_result(0x4E)	
-	m_add_result(0x4E)	// Jeff's offset to the address
-	m_add_result(0x1E)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)	
+	m_add_result(PTY_BTLR_STRUCT_SIZE)	// Jeff's offset to the address
+	m_add_result(SPRITE_AFF_OFFSET)
 	m_rtovar7		// Jeff's Sprite Changing status
 	m_set_var6(0)	// Frame count for our Sine function in Y direction
 	m_set_var3(0x40)// Frame count for our Sine function in x direction
@@ -1604,22 +1598,21 @@ End:
 }
 
 CreateJeffBattleSprLogic: {
-	Vittorio_bowspr_preamble
+	bowspr_preamble
 	m_ontick_nop
 	m_priority(3)
 	
-	m_get_mem16(0x988B)
-	m_and_result(0xFF)
-	m_add_result(-1)
-	m_jne(End)
-	
+	m_set_result(3)		// Load in Jeff's party ID
+	m_asmcall(ASM_CheckIfInParty)	// Check if he is in the party
+	m_jeq(End)			// If not, don't draw him
+
 	m_set_xpos(AS_JEFF_X_POS)
 	m_set_ypos(AS_FRONT_ROW_Y_POS)
 	m_set_facing_anim(NE, 0)
 						
 	m_set_result(PTY_BTLR_ADDR)
-	m_add_result(0x4E)
-	m_add_result(0x4E)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)
 	m_rtovar7			// Var7 contains Jeff's Battler address
 	m_set_result(0)	
 	m_rtovar6			// Var6 is Jeff's possession/mushroomized status
@@ -1656,7 +1649,7 @@ Goods:
 		JeffGoodsAnimation
 		
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short GoodsContinue
@@ -1689,7 +1682,7 @@ Defend:
 		JeffDefendAnimation
 		
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short DefendContinue
@@ -1722,7 +1715,7 @@ Spy:
 		JeffSpyAnimation
 			
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short SpyContinue
@@ -1755,7 +1748,7 @@ RunAway:
 		JeffRunawayAnimation
 		
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short RunAwayContinue
@@ -1776,25 +1769,25 @@ RunAway:
 StatusAffiction:
 	CheckHomesickness:
 		m_get_var7
-		m_add_result(0x22)
+		m_add_result(HOMESICKNESS_OFFSET)
 		m_get_mem8_at_result
 		m_jne(Homesickness)
 	
 	CheckCannotConcentrate:
 		m_get_var7
-		m_add_result(0x21)
+		m_add_result(CONSENTRATE_OFFSET)
 		m_get_mem8_at_result
 		m_jne(CannotConcentrate)
 		
 	CheckFeelingStrange:
 		m_get_var7
-		m_add_result(0x20)
+		m_add_result(FEEL_STRANGE_OFFSET)
 		m_get_mem8_at_result
 		m_jne(FeelingStrange)
 		
-	CheckInOverworldAffliction:
+	CheckSpriteAffliction:
 		m_get_var7
-		m_add_result(0x1E)
+		m_add_result(SPRITE_AFF_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short CheckInBattleAffliction
@@ -1803,7 +1796,7 @@ StatusAffiction:
 		
 	CheckInBattleAffliction:
 		m_get_var7
-		m_add_result(0x1F)
+		m_add_result(BATTLE_AFF_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(5)
 			short CheckPermanentAffliction
@@ -1814,7 +1807,7 @@ StatusAffiction:
 		
 	CheckPermanentAffliction:
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_jeq(Normal)
 		m_multijmp(8)
@@ -2114,20 +2107,20 @@ Poo_Create_TinyGhost:
 
 
 PooCreateMushroom: {
-	Vittorio_bowspr_preamble
+	bowspr_preamble
 	m_ontick_nop
 	m_priority(0)
 	
 	m_set_facing_anim(N, 0)
 	m_refresh_graphics
 	m_warp_to_sprite(POO_IDLE_SPRITE)
-	m_add_ypos(-0x0E)
+	m_add_ypos(SUBSPRITE_OFFSET)
 	
 	m_set_result(PTY_BTLR_ADDR)
-	m_add_result(0x4E)
-	m_add_result(0x4E)
-	m_add_result(0x4E)	// Offset to get Poo's data in battle
-	m_add_result(0x1E)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)	// Offset to get Poo's data in battle
+	m_add_result(SPRITE_AFF_OFFSET)
 	m_rtovar7		// Poo's Sprite Changing status
 
 Loop:
@@ -2148,20 +2141,20 @@ End:
 }
 
 PooCreateTinyGhost: {
-	Vittorio_bowspr_preamble
+	bowspr_preamble
 	m_ontick_nop
 	m_priority(0)
 	
 	m_set_facing_anim(N, 0)
 	m_refresh_graphics
 	m_warp_to_sprite(POO_IDLE_SPRITE)
-	m_add_ypos(-0x0E)
+	m_add_ypos(SUBSPRITE_OFFSET)
 	
 	m_set_result(PTY_BTLR_ADDR)
-	m_add_result(0x4E)
-	m_add_result(0x4E)
-	m_add_result(0x4E)	// Poo's offset to the address
-	m_add_result(0x1E)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)	// Poo's offset to the address
+	m_add_result(SPRITE_AFF_OFFSET)
 	m_rtovar7		// Poo's Sprite Changing status
 	m_set_var6(0)	// Frame count for our Sine function in Y direction
 	m_set_var3(0x40)// Frame count for our Sine function in x direction
@@ -2193,10 +2186,8 @@ End:
 	m_destroy_self
 }
 
-// TODO: Poo's mirror enemy isn't showing or displaying on the battle field, not sure
-//       what could be the problem.....
 PooCreateMirrorEnemy: {
-	Vittorio_bowspr_preamble
+	bowspr_preamble
 	m_ontick_nop
 	m_priority(0)
 	
@@ -2212,8 +2203,7 @@ Loop:
 	m_get_mem8_at_result
 	m_jeq(End)
 	
-LoopBack:
-	// Animate the mirror sprite
+AnimateMirrorSprite:
 	m_set_facing_anim(N, 0)
 	m_refresh_graphics_frame0
 	m_pause(10)
@@ -2229,23 +2219,22 @@ End:
 }
 
 CreatePooBattleSprLogic: {
-	Vittorio_bowspr_preamble
+	bowspr_preamble
 	m_ontick_nop
 	m_priority(3)
 	
-	m_get_mem16(0x988B)
-	m_and_result(0xFF)
-	m_add_result(-1)
-	m_jne(End)
+	m_set_result(4)		// Load in Poo's party ID
+	m_asmcall(ASM_CheckIfInParty)	// Check if he is in the party
+	m_jeq(End)			// If not, don't draw him
 	
 	m_set_xpos(AS_POO_X_POS)
 	m_set_ypos(AS_BACK_ROW_Y_POS)
 	m_set_facing_anim(NE, 0)
 						
 	m_set_result(PTY_BTLR_ADDR)
-	m_add_result(0x4E)
-	m_add_result(0x4E)
-	m_add_result(0x4E)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)
+	m_add_result(PTY_BTLR_STRUCT_SIZE)
 	m_rtovar7			// Var7 contains Poo's Battler address
 	m_set_result(0)	
 	m_rtovar6			// Var6 is Poo's possession/mushroomized status
@@ -2282,7 +2271,7 @@ Goods:
 		PooGoodsAnimation
 		
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short GoodsContinue
@@ -2315,7 +2304,7 @@ Defend:
 		PooDefendAnimation
 		
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short DefendContinue
@@ -2348,7 +2337,7 @@ PSI:
 		PooPSIAnimation
 			
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short PSIContinue
@@ -2373,14 +2362,7 @@ Mirror:
 	m_get_mem8_at_result
 	m_jeq(RunAway)
 	
-	// TODO: Will have to see the text that has Poo's mirror inside so we can set the flag
-	//       in there instead of setting it in the battle_menu file.
-	
-	m_set_result(MIRROR_ENEMY_ID)
-	m_get_mem8_at_result
-	m_asmcall(ASM_ReturnEnemyOverworldSpriteID)
 	m_asmcall(ASM_CreatePooMirrorSprite)
-	
 	MOV_ChangeSpriteGroup(POO_MIRROR_SPRITE)
 	m_refresh_graphics
 	
@@ -2391,7 +2373,7 @@ Mirror:
 		PooMirrorAnimation
 			
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short MirrorContinue
@@ -2426,7 +2408,7 @@ RunAway:
 		PooRunawayAnimation
 		
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short RunAwayContinue
@@ -2447,25 +2429,25 @@ RunAway:
 StatusAffiction:
 	CheckHomesickness:
 		m_get_var7
-		m_add_result(0x22)
+		m_add_result(HOMESICKNESS_OFFSET)
 		m_get_mem8_at_result
 		m_jne(Homesickness)
 	
 	CheckCannotConcentrate:
 		m_get_var7
-		m_add_result(0x21)
+		m_add_result(CONSENTRATE_OFFSET)
 		m_get_mem8_at_result
 		m_jne(CannotConcentrate)
 		
 	CheckFeelingStrange:
 		m_get_var7
-		m_add_result(0x20)
+		m_add_result(FEEL_STRANGE_OFFSET)
 		m_get_mem8_at_result
 		m_jne(FeelingStrange)
 		
-	CheckInOverworldAffliction:
+	CheckSpriteAffliction:
 		m_get_var7
-		m_add_result(0x1E)
+		m_add_result(SPRITE_AFF_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(3)
 			short CheckInBattleAffliction
@@ -2474,7 +2456,7 @@ StatusAffiction:
 		
 	CheckInBattleAffliction:
 		m_get_var7
-		m_add_result(0x1F)
+		m_add_result(BATTLE_AFF_OFFSET)
 		m_get_mem8_at_result
 		m_multijmp(5)
 			short CheckPermanentAffliction
@@ -2485,7 +2467,7 @@ StatusAffiction:
 		
 	CheckPermanentAffliction:
 		m_get_var7
-		m_add_result(0x1D)
+		m_add_result(PERM_STAT_OFFSET)
 		m_get_mem8_at_result
 		m_jeq(Normal)
 		m_multijmp(8)
@@ -2807,7 +2789,8 @@ define OBJ_Script_Var4		= 0x0F4E
 define OBJ_Script_Var5		= 0x0F8A
 define OBJ_Script_Var6		= 0x0FC6
 define OBJ_Script_Var7		= 0x1002
-
+define ENEMY_CONFIG_OFFSET	= 0x5E
+define ENEMY_OVERWORLD_OFFSET = 0x1E
 
 
 
@@ -2867,95 +2850,6 @@ Sine:{
 	RTL
 }
 
-ASM_Divide16FromResult: {
-	LSR
-	LSR
-	LSR
-	LSR
-	RTL
-}
-
-ASM_Divide8FromResult: {
-	LSR
-	LSR
-	LSR
-	RTL
-}
-
-ASM_ResultPlusVar0: {
-	REP (0x31)
-	PHD
-	PHA
-	TDC
-	ADC_i (0xFFFE)
-	TCD
-	PLA
-	
-	TAY
-	LDA_a (Current_Object_Slot)
-	ASL
-	TAX
-	LDA_x (OBJ_Script_Var0)
-	STA_d (0x02)
-	TYA
-	CLC
-	ADC_d (0x02)
-	
-	PLD
-	RTL
-}
-
-ASM_ResultPlusVar1: {
-	REP (0x31)
-	PHD
-	PHA
-	TDC
-	ADC_i (0xFFFE)
-	TCD
-	PLA
-	
-	TAY
-	LDA_a (Current_Object_Slot)
-	ASL
-	TAX
-	LDA_x (OBJ_Script_Var1)
-	STA_d (0x02)
-	TYA
-	CLC
-	ADC_d (0x02)
-	
-	PLD
-	RTL
-}
-
-// A: ID of the enemy in battle
-// Returns: A: The enemy's Overworld Sprite ID
-ASM_ReturnEnemyOverworldSpriteID: {
-	REP (0x31)
-	PHD
-	PHA
-	TDC
-	ADC_i (0xFFEE)
-	TCD
-	PLA 
-	
-	LDY_i (0x5E)
-	JSL (0xC09032)	// Multiply A and Y register, return result to A register
-	CLC
-	ADC_i (0x1E)	// Add the offset for the enemy's overworld sprite
-	TAY				// Transfer result to Y register
-
-	LDA_i (short[0] ENEMY_CONFIG_TABLE)
-	STA_d (0x02)
-	LDA_i (short[1] ENEMY_CONFIG_TABLE)
-	STA_d (0x04)
-	
-	LDA_dly (0x02)	// Load in the enemy's overworld sprite ID
-	
-	PLD
-	RTL
-}
-
 ASM_CreatePooMirrorSprite: {
 	REP (0x31)
 	PHD
@@ -2963,16 +2857,31 @@ ASM_CreatePooMirrorSprite: {
 	TDC
 	ADC_i (0xFFEE)
 	TCD
-	PLA 
 	
+	LDX_i (MIRROR_ENEMY_ID_ADDR)
+	LDA_x (0x0000)
+	AND_i (0x00FF)	// Get the enemy ID of the mirrored enemy
+	LDY_i (ENEMY_CONFIG_OFFSET)
+	JSL (0xC09032)	// Multiply Enemy ID and Offset, return offset to that enemy's entry
+	CLC
+	ADC_i (ENEMY_OVERWORLD_OFFSET)	// Add the offset to get the enemy's overworld sprite ID address
+	TAY				// Transfer exact offset to Y
+
+	LDA_i (short[0] ENEMY_CONFIG_TABLE)
 	STA_d (0x02)
+	LDA_i (short[1] ENEMY_CONFIG_TABLE)
+	STA_d (0x04)	// Load enemy config table to DPR 0x02 and 0x04
+	
+	LDA_dly (0x02)	// Load in the enemy's overworld sprite ID
+	STA_d (0x02)	// Store the sprite ID
+	
 	LDA_i (short[0] PooCreateMirrorEnemy)
 	STA_d (0x0E)
 	LDA_i (short[1] PooCreateMirrorEnemy)
-	STA_d (0x10)
+	STA_d (0x10)	// Store the Action Script address for the new mirror sprite
 	
-	LDA_d (0x02)
-	JSL (ASM_BowsprCreateEntity)
+	LDA_d (0x02)	// Load the Sprite ID
+	JSL (ASM_BowsprCreateEntity)	// Create that mirrored sprite with the Action Script
 	
 	PLD
 	RTL
@@ -3118,6 +3027,47 @@ Return:
 	LDA_d (0x0C)
 	STA_x (0x0000)
 
+	PLD
+	RTL
+}
+
+// A: The party member ID
+// Returns: A: 1 if true, 0 otherwise
+ASM_CheckIfInParty: {
+	REP (0x31)
+	PHD
+	PHA
+	TDC
+	ADC_i (0xFFFE)
+	TCD
+	PLA
+	
+	AND_i (0x00FF)		// Get low byte from the party member ID
+	STA_d (0x02)		// Store the current party member's ID we want to check
+	LDX_i (CURRENT_PARTY_ADDR)
+	LDY_i (0x0007)		// Size of the party / Iterator limit
+	
+ForLoop:
+	CPY_i (0x0000)		// Check if we're done iterating through our party
+	BEQ_a (NotInParty)	// If so, then we return 0 (false)
+	
+	LDA_x (0x0000)		// Else, check current party index
+	AND_i (0x00FF)		// Get low byte from the load
+	CMP_d (0x02)		// See if it's our party member of interest
+	BEQ_a (IsInParty)	// If so, then return 1 (true)
+	
+	INX					// Else, we load our next party index
+	DEY					// Decrement our iterator
+	BRA_a (ForLoop)		// Check the next party member
+	
+NotInParty:
+	LDA_i (0x0000)		// Load 0 (false) value
+	BRA_a (Return)
+	
+IsInParty:
+	LDA_i (0x0001)		// Load 1 (true) value
+	
+Return:
 	PLD
 	RTL
 }
