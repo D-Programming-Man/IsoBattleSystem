@@ -1,12 +1,17 @@
-# IsoBattleSystem (WIP)
-Isometric Battle System for EB, a work in progress scripting thing that aims to make EB's battle system more visual appealing by representing characters onto the battle field
-Still in a WIP, TODOs:
-* Make Paula, Jeff, and Poo have their own battle sprites appear and do similar things that Ness has implemented
-* Get feedback on what to improve next and bugfix if needed
-
-Special thanks to:
-* Catador - Making the movscr_codes.ccs file, everything basically hinges on this script file for the main animations to work
-* Cooprocks123e - Making movescr_memaccess.ccs file, needed for movement scripts for sprites to change animations
-* Vittorio - ASM code for helping me to align sprites to certain layers to keep them not bouncing when players/enemies do SMAAAAASH-ing damage
-* JTolmar - Writing the battle_menu.ccs file, I did not want to touch the battle menu routine and this makes it easier to intergrate the flags into it
-* And anyone else that I haven't credit yet, please let me know if you had helped me. I am a forgetful (D-)man TwT
+# BowsprBattleSystem
+What this script does is to add your party's representation during battle. It has
+support for animations to your party: idle, status affected, or special case 
+attacks like prayer for Paula and mirror for Poo. Although, only the main 4 characters
+are implemented, however it's not hard to make more for the other NPC characters.
+ 
+Thanks to:                                                                         
+* Catador
+  - Making movscr_codes that's paramount to most Action/Movement Scripts     
+* Cooprocks123e
+  - Making Bowspr for adding sprites in battle, majority of this script requires both this and movscr_codes                                
+* JTolmar
+  - Making the battle_menu, I'd rather not edit the raw ASM for the battle menu so having this is very handy adding flags to it                     
+* Vittorio
+  - Knowledge and advice on how the heck to not make sprites keep on springing up and down when an enemy attacks.                            
+* SupremeKribs
+  - Advice on what routines to look after for enemy adjustments         
